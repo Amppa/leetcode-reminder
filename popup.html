@@ -31,14 +31,14 @@
         <span class="status-label" id="statusText">載入中...</span>
       </div>
 
-      <!-- Problem Info Box -->
-      <div class="problem-box" id="problemBox">
+      <!-- Problem Info Box (Clickable Link) -->
+      <a class="problem-box" id="problemBox" href="https://leetcode.com/problemset/all/" target="_blank" rel="noopener noreferrer">
         <div class="problem-header">
           <span class="problem-id" id="problemId">--</span>
           <span class="difficulty-tag" id="difficultyTag">--</span>
         </div>
         <div class="problem-title" id="problemTitle">正在獲取今日題目...</div>
-      </div>
+      </a>
 
       <!-- Meta Info Rows -->
       <div class="meta-info">
@@ -52,13 +52,6 @@
         </div>
       </div>
     </section>
-
-    <!-- Action Button -->
-    <footer class="action-footer">
-      <a href="https://leetcode.com/problemset/all/" target="_blank" class="btn-primary" id="openProblemBtn">
-        前往 LeetCode 今日挑戰
-      </a>
-    </footer>
   </div>
 
   <script src="popup.js"></script>

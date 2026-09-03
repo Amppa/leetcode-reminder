@@ -91,8 +91,13 @@ body {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Status Section */
@@ -129,6 +134,7 @@ body {
   background-color: rgba(16, 185, 129, 0.15);
   color: var(--accent-green);
 }
+
 .status-badge.success .status-dot {
   background-color: var(--accent-green);
   box-shadow: 0 0 8px var(--accent-green);
@@ -138,6 +144,7 @@ body {
   background-color: rgba(239, 68, 68, 0.15);
   color: var(--accent-red);
 }
+
 .status-badge.pending .status-dot {
   background-color: var(--accent-red);
   box-shadow: 0 0 8px var(--accent-red);
@@ -147,16 +154,31 @@ body {
   background-color: rgba(245, 158, 11, 0.15);
   color: var(--accent-yellow);
 }
+
 .status-badge.warning .status-dot {
   background-color: var(--accent-yellow);
 }
 
 /* Problem Box */
 .problem-box {
+  display: block;
+  text-decoration: none;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.problem-box:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translate(-2px, -2px);
+}
+
+.problem-box:active {
+  transform: translate(0, 0);
 }
 
 .problem-header {
@@ -179,9 +201,20 @@ body {
   border-radius: 4px;
 }
 
-.difficulty-tag.Easy { color: var(--color-easy); background: rgba(0, 184, 163, 0.12); }
-.difficulty-tag.Medium { color: var(--color-medium); background: rgba(255, 192, 30, 0.12); }
-.difficulty-tag.Hard { color: var(--color-hard); background: rgba(255, 55, 95, 0.12); }
+.difficulty-tag.Easy {
+  color: var(--color-easy);
+  background: rgba(0, 184, 163, 0.12);
+}
+
+.difficulty-tag.Medium {
+  color: var(--color-medium);
+  background: rgba(255, 192, 30, 0.12);
+}
+
+.difficulty-tag.Hard {
+  color: var(--color-hard);
+  background: rgba(255, 55, 95, 0.12);
+}
 
 .problem-title {
   font-size: 13px;
@@ -213,31 +246,4 @@ body {
 .meta-value {
   color: #e4e4e7;
   font-weight: 500;
-}
-
-/* Action Footer */
-.action-footer {
-  display: flex;
-}
-
-.btn-primary {
-  width: 100%;
-  text-align: center;
-  background-color: #ffa116; /* LeetCode Signature Gold/Orange */
-  color: #000;
-  padding: 9px 0;
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: 8px;
-  text-decoration: none;
-  transition: opacity 0.2s, transform 0.1s;
-  display: block;
-}
-
-.btn-primary:hover {
-  opacity: 0.92;
-}
-
-.btn-primary:active {
-  transform: scale(0.98);
 }

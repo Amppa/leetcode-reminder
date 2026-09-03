@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const problemTitle = document.getElementById('problemTitle');
   const lastCheckTime = document.getElementById('lastCheckTime');
   const resetCountdown = document.getElementById('resetCountdown');
-  const openProblemBtn = document.getElementById('openProblemBtn');
+  const problemBox = document.getElementById('problemBox');
   const refreshBtn = document.getElementById('refreshBtn');
 
   // Calculate remaining time until next UTC 00:00 and format local reset hour
@@ -53,39 +53,39 @@ document.addEventListener('DOMContentLoaded', () => {
     statusBadge.className = 'status-badge';
 
     if (isLoggedIn === false || lastStatus === 'not_logged_in') {
+      const loginUrl = 'https://leetcode.com/accounts/login/';
       statusBadge.classList.add('warning');
       statusText.textContent = '未登入 LeetCode';
       problemId.textContent = '--';
       difficultyTag.textContent = 'Auth';
       difficultyTag.className = 'difficulty-tag';
-      problemTitle.textContent = '請點擊下方按鈕登入 LeetCode 帳號';
-      openProblemBtn.textContent = '前往 LeetCode 登入';
-      openProblemBtn.href = 'https://leetcode.com/accounts/login/';
+      problemTitle.textContent = '請點擊此處登入 LeetCode 帳號';
+      if (problemBox) problemBox.href = loginUrl;
     } else if (lastStatus === 'Finish') {
+      const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('success');
       statusText.textContent = '今日已解題完成！';
       problemId.textContent = questionId ? `#${questionId}` : 'Daily';
       difficultyTag.textContent = difficulty || 'Solved';
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
       problemTitle.textContent = title || '今日題目已搞定';
-      openProblemBtn.textContent = '查看題目討論 / 詳情';
-      openProblemBtn.href = questionLink || 'https://leetcode.com/problemset/all/';
+      if (problemBox) problemBox.href = targetUrl;
     } else if (lastStatus === 'error') {
+      const allUrl = 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('warning');
       statusText.textContent = '檢查連線異常';
       problemTitle.textContent = '無法取得題目資訊，請檢查網路或稍後重試';
-      openProblemBtn.textContent = '前往 LeetCode 題庫';
-      openProblemBtn.href = 'https://leetcode.com/problemset/all/';
+      if (problemBox) problemBox.href = allUrl;
     } else {
       // Unfinished
+      const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('pending');
       statusText.textContent = '今日尚未完成';
       problemId.textContent = questionId ? `#${questionId}` : 'Daily';
       difficultyTag.textContent = difficulty || 'Normal';
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
       problemTitle.textContent = title || '尚未解題';
-      openProblemBtn.textContent = '立即挑戰今日難題';
-      openProblemBtn.href = questionLink || 'https://leetcode.com/problemset/all/';
+      if (problemBox) problemBox.href = targetUrl;
     }
 
     if (lastCheckTime) {
