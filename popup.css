@@ -285,6 +285,105 @@ body {
   font-weight: 500;
 }
 
+/* Contest Section Component */
+.contest-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.contest-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.contest-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+
+.contest-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.contest-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.contest-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+.contest-link:hover .contest-title {
+  color: #ffa116;
+}
+
+.contest-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.reminder-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.reminder-label:hover {
+  color: var(--text-main);
+}
+
+.reminder-checkbox {
+  accent-color: #ffa116;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+}
+
 /* Animations */
 @keyframes spin {
   from {

@@ -1,4 +1,4 @@
-// Pure Vanilla JS (<4KB) for LeetCode Reminder Popup
+// Pure Vanilla JS (<5KB) for LeetCode Reminder Popup
 // Zero external dependencies, instant render
 
 const I18N = {
@@ -21,7 +21,21 @@ const I18N = {
     tag_todo: 'Todo',
     tag_auth: 'Auth',
     tag_error: 'Error',
-    time_remaining: (h, m) => `剩 ${h}小時${m}分`
+    time_remaining: (h, m) => `剩 ${h}小時${m}分`,
+    contest_section_title: '周賽活動',
+    badge_weekly: '周賽',
+    badge_biweekly: '雙周賽',
+    weekly_title_default: 'Weekly Contest',
+    biweekly_title_default: 'Biweekly Contest',
+    contest_reminder_text: '1h 前提醒',
+    contest_calc: '計算中...',
+    contest_started: '比賽進行中',
+    contest_ended: '已結束，等待更新',
+    contest_countdown: (days, hours, mins) => {
+      if (days > 0) return `距開始：${days}天 ${hours}小時`;
+      if (hours > 0) return `距開始：${hours}小時 ${mins}分`;
+      return `距開始：${mins}分鐘`;
+    }
   },
   en: {
     langBtn: '中',
@@ -42,7 +56,21 @@ const I18N = {
     tag_todo: 'Todo',
     tag_auth: 'Auth',
     tag_error: 'Error',
-    time_remaining: (h, m) => `${h}h ${m}m left`
+    time_remaining: (h, m) => `${h}h ${m}m left`,
+    contest_section_title: 'Contests',
+    badge_weekly: 'Weekly',
+    badge_biweekly: 'Biweekly',
+    weekly_title_default: 'Weekly Contest',
+    biweekly_title_default: 'Biweekly Contest',
+    contest_reminder_text: '1h before',
+    contest_calc: 'Calculating...',
+    contest_started: 'In progress',
+    contest_ended: 'Ended, waiting for update',
+    contest_countdown: (days, hours, mins) => {
+      if (days > 0) return `Starts in ${days}d ${hours}h`;
+      if (hours > 0) return `Starts in ${hours}h ${mins}m`;
+      return `Starts in ${mins}m`;
+    }
   }
 };
 
@@ -61,11 +89,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetCountdown = document.getElementById('resetCountdown');
   const problemBox = document.getElementById('problemBox');
 
+  // Contest DOM elements
+  const contestSectionTitle = document.getElementById('contestSectionTitle');
+  const weeklyLink = document.getElementById('weeklyLink');
+  const weeklyTitle = document.getElementById('weeklyTitle');
+  const weeklyCountdown = document.getElementById('weeklyCountdown');
+  const weeklyReminderCheckbox = document.getElementById('weeklyReminderCheckbox');
+  const weeklyReminderText = document.getElementById('weeklyReminderText');
+
+  const biweeklyLink = document.getElementById('biweeklyLink');
+  const biweeklyTitle = document.getElementById('biweeklyTitle');
+  const biweeklyCountdown = document.getElementById('biweeklyCountdown');
+  const biweeklyReminderCheckbox = document.getElementById('biweeklyReminderCheckbox');
+  const biweeklyReminderText = document.getElementById('biweeklyReminderText');
+
   let currentLang = 'zh';
   let cachedData = {};
 
-  // Calculate remaining time until next UTC 00:00 and format local reset hour
-  function updateResetTime() {
+  // Format countdown string for contests
+  function formatContestCountdown(startTimeSec, durationSec = 5400) {
+    const t = I18N[currentLang];
+    if (!startTimeSec) return t.contest_calc;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const diffSec = startTimeSec - nowSec;
+
+    if (diffSec <= 0) {
+      if (diffSec + durationSec > 0) {
+        return t.contest_started;
+      }
+      return t.contest_ended;
+    }
+
+    const days = Math.floor(diffSec / 86400);
+    const hours = Math.floor((diffSec % 86400) / 3600);
+    const mins = Math.floor((diffSec % 3600) / 60);
+
+    return t.contest_countdown(days, hours, mins);
+  }
+
+  // Update countdowns (Daily UTC reset + Contests)
+  function updateAllCountdowns() {
     const now = new Date();
     const utcHours = now.getUTCHours();
     const utcMinutes = now.getUTCMinutes();
@@ -84,6 +148,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = I18N[currentLang];
       resetCountdown.textContent = `${localHour}:${localMin} (${t.time_remaining(remHours, remMinutes)})`;
     }
+
+    // Update contest countdowns
+    const weekly = cachedData?.contests?.weekly;
+    const biweekly = cachedData?.contests?.biweekly;
+
+    if (weeklyCountdown) {
+      weeklyCountdown.textContent = formatContestCountdown(weekly?.startTime, weekly?.duration);
+    }
+    if (biweeklyCountdown) {
+      biweeklyCountdown.textContent = formatContestCountdown(biweekly?.startTime, biweekly?.duration);
+    }
   }
 
   // Apply language strings to static & dynamic UI elements
@@ -97,6 +172,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (subtitle) subtitle.textContent = t.subtitle;
     if (labelLastCheck) labelLastCheck.textContent = t.label_last_check;
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
+
+    // Contests section i18n
+    if (contestSectionTitle) contestSectionTitle.textContent = t.contest_section_title;
+    if (weeklyReminderText) weeklyReminderText.textContent = t.contest_reminder_text;
+    if (biweeklyReminderText) biweeklyReminderText.textContent = t.contest_reminder_text;
   }
 
   // Render UI with cached data
@@ -109,7 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
       questionId,
       questionTitle: title,
       questionDifficulty: difficulty,
-      questionLink
+      questionLink,
+      contests,
+      contestReminders = { weekly_1h: true, biweekly_1h: true }
     } = data;
 
     const t = I18N[currentLang];
@@ -160,7 +242,51 @@ document.addEventListener('DOMContentLoaded', () => {
       lastCheckTime.textContent = checkTime || '--';
     }
 
-    updateResetTime();
+    // Render Weekly Contest
+    const weekly = contests?.weekly;
+    if (weekly) {
+      if (weeklyTitle) weeklyTitle.textContent = weekly.title || t.weekly_title_default;
+      if (weeklyLink) weeklyLink.href = weekly.link || 'https://leetcode.com/contest/';
+    } else {
+      if (weeklyTitle) weeklyTitle.textContent = t.weekly_title_default;
+    }
+
+    // Render Biweekly Contest
+    const biweekly = contests?.biweekly;
+    if (biweekly) {
+      if (biweeklyTitle) biweeklyTitle.textContent = biweekly.title || t.biweekly_title_default;
+      if (biweeklyLink) biweeklyLink.href = biweekly.link || 'https://leetcode.com/contest/';
+    } else {
+      if (biweeklyTitle) biweeklyTitle.textContent = t.biweekly_title_default;
+    }
+
+    // Checkbox states
+    if (weeklyReminderCheckbox) {
+      weeklyReminderCheckbox.checked = contestReminders.weekly_1h !== false;
+    }
+    if (biweeklyReminderCheckbox) {
+      biweeklyReminderCheckbox.checked = contestReminders.biweekly_1h !== false;
+    }
+
+    updateAllCountdowns();
+  }
+
+  // Save checkbox setting and trigger alarm sync
+  function saveContestReminderSettings() {
+    const settings = {
+      weekly_1h: weeklyReminderCheckbox ? weeklyReminderCheckbox.checked : true,
+      biweekly_1h: biweeklyReminderCheckbox ? biweeklyReminderCheckbox.checked : true
+    };
+    chrome.storage.local.set({ contestReminders: settings }, () => {
+      chrome.runtime.sendMessage({ action: 'update_contest_alarms' });
+    });
+  }
+
+  if (weeklyReminderCheckbox) {
+    weeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
+  }
+  if (biweeklyReminderCheckbox) {
+    biweeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
   }
 
   // 1. Load language preference & cached data
@@ -171,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderData(items || {});
 
     // If no status was ever checked or recorded, trigger background check automatically
-    if (!items || !items.lastStatus) {
+    if (!items || !items.lastStatus || !items.contests) {
       if (refreshBtn) refreshBtn.classList.add('spinning');
       chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
         if (refreshBtn) refreshBtn.classList.remove('spinning');
@@ -205,5 +331,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Update countdown every minute if popup is open
-  setInterval(updateResetTime, 60000);
+  setInterval(updateAllCountdowns, 60000);
 });

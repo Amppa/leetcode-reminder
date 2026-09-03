@@ -18,11 +18,29 @@ function getFormattedTime() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Minimal GraphQL payload (only fields strictly needed)
+// Combined GraphQL payload: questionOfToday + topTwoContests (0 overhead, single HTTP request)
 const GRAPHQL_QUERY = JSON.stringify({
-  query: "query questionOfToday { activeDailyCodingChallengeQuestion { date userStatus link question { frontendQuestionId: questionFrontendId title titleSlug difficulty } } }",
+  query: `query dailyAndContests {
+    activeDailyCodingChallengeQuestion {
+      date
+      userStatus
+      link
+      question {
+        frontendQuestionId: questionFrontendId
+        title
+        titleSlug
+        difficulty
+      }
+    }
+    topTwoContests {
+      title
+      titleSlug
+      startTime
+      duration
+    }
+  }`,
   variables: {},
-  operationName: "questionOfToday"
+  operationName: "dailyAndContests"
 });
 
 // Update extension icon badge
@@ -52,14 +70,76 @@ function setupAlarm() {
   });
 }
 
+// Fetch upcoming contests (Public API, zero login required)
+async function fetchUpcomingContests() {
+  const query = JSON.stringify({
+    query: `query topTwoContests {
+      topTwoContests {
+        title
+        titleSlug
+        startTime
+        duration
+      }
+    }`,
+    variables: {},
+    operationName: "topTwoContests"
+  });
+
+  try {
+    const res = await fetch(LEETCODE_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Referer': 'https://leetcode.com/contest/',
+        'Origin': 'https://leetcode.com'
+      },
+      body: query
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const topContests = json?.data?.topTwoContests || [];
+      let weeklyContest = null;
+      let biweeklyContest = null;
+
+      for (const c of topContests) {
+        const slug = (c.titleSlug || '').toLowerCase();
+        const info = {
+          title: c.title,
+          titleSlug: c.titleSlug,
+          startTime: c.startTime, // Unix timestamp (seconds)
+          duration: c.duration,
+          link: `https://leetcode.com/contest/${c.titleSlug}/`
+        };
+        if (slug.includes('biweekly')) {
+          biweeklyContest = info;
+        } else if (slug.includes('weekly')) {
+          weeklyContest = info;
+        }
+      }
+
+      const contests = { weekly: weeklyContest, biweekly: biweeklyContest };
+      await chrome.storage.local.set({ contests });
+      await syncContestAlarms(contests);
+      return contests;
+    }
+  } catch (err) {
+    console.warn('[LeetCode Reminder] Fetch contests failed:', err);
+  }
+  return null;
+}
+
 // Check LeetCode Daily Challenge status
 async function checkLeetCodeDaily(forceCheck = false) {
   const todayUtc = getUtcTodayString();
 
-  // 0. Language preference
+  // 0. Always refresh upcoming contests
+  await fetchUpcomingContests();
+
+  // 1. Language preference
   const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
 
-  // 1. Storage-First Check: If already finished today (UTC) and not forced, skip network call completely
+  // 2. Storage-First Check: If already finished today (UTC) and not forced, skip daily question network call
   if (!forceCheck) {
     const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
     if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
@@ -68,7 +148,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
     }
   }
 
-  // 2. Cookie Check: Check LEETCODE_SESSION & csrftoken
+  // 3. Cookie Check: Check LEETCODE_SESSION & csrftoken
   let sessionCookie = null;
   let csrfCookie = null;
   try {
@@ -144,6 +224,27 @@ async function checkLeetCodeDaily(forceCheck = false) {
     const link = dailyData.link || '';
     const fullLink = link.startsWith('http') ? link : `https://leetcode.com${link}`;
 
+    // Parse Weekly & Biweekly Contests
+    const topContests = json?.data?.topTwoContests || [];
+    let weeklyContest = null;
+    let biweeklyContest = null;
+
+    for (const c of topContests) {
+      const slug = (c.titleSlug || '').toLowerCase();
+      const info = {
+        title: c.title,
+        titleSlug: c.titleSlug,
+        startTime: c.startTime, // Unix timestamp (seconds)
+        duration: c.duration,
+        link: `https://leetcode.com/contest/${c.titleSlug}/`
+      };
+      if (slug.includes('biweekly')) {
+        biweeklyContest = info;
+      } else if (slug.includes('weekly')) {
+        weeklyContest = info;
+      }
+    }
+
     const updatePayload = {
       isLoggedIn: true,
       lastStatus: userStatus,
@@ -152,7 +253,11 @@ async function checkLeetCodeDaily(forceCheck = false) {
       questionId: question?.frontendQuestionId || '',
       questionTitle: question?.title || '',
       questionDifficulty: question?.difficulty || '',
-      questionLink: fullLink
+      questionLink: fullLink,
+      contests: {
+        weekly: weeklyContest,
+        biweekly: biweeklyContest
+      }
     };
 
     if (userStatus === 'Finish') {
@@ -181,6 +286,9 @@ async function checkLeetCodeDaily(forceCheck = false) {
         priority: 2
       });
     }
+
+    // Schedule 1-hour before alarms for contests if enabled
+    await syncContestAlarms(updatePayload.contests);
   } catch (err) {
     console.error('[LeetCode Reminder] GraphQL fetch failed:', err);
     await chrome.storage.local.set({
@@ -188,6 +296,36 @@ async function checkLeetCodeDaily(forceCheck = false) {
       lastCheckTime: getFormattedTime()
     });
     await updateBadge('error');
+  }
+}
+
+// Sync 1-hour before alarms for Weekly & Biweekly Contests
+async function syncContestAlarms(contests) {
+  if (!contests) {
+    const data = await chrome.storage.local.get(['contests', 'contestReminders']);
+    contests = data.contests;
+  }
+  const { contestReminders = { weekly_1h: true, biweekly_1h: true } } = await chrome.storage.local.get('contestReminders');
+
+  const types = ['weekly', 'biweekly'];
+  for (const type of types) {
+    const alarmName = `contest_alarm_${type}`;
+    const contest = contests?.[type];
+    const isEnabled = contestReminders[`${type}_1h`] !== false;
+
+    if (isEnabled && contest?.startTime) {
+      // Trigger exactly 60 minutes before contest start
+      const triggerTimeMs = (contest.startTime - 3600) * 1000;
+      const nowMs = Date.now();
+
+      if (triggerTimeMs > nowMs) {
+        chrome.alarms.create(alarmName, { when: triggerTimeMs });
+      } else {
+        chrome.alarms.clear(alarmName);
+      }
+    } else {
+      chrome.alarms.clear(alarmName);
+    }
   }
 }
 
@@ -201,6 +339,12 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
       : data.questionLink;
 
     chrome.tabs.create({ url: targetUrl });
+  } else if (notificationId.startsWith('contest_notify_')) {
+    chrome.notifications.clear(notificationId);
+    const type = notificationId.replace('contest_notify_', '');
+    const { contests } = await chrome.storage.local.get('contests');
+    const contestUrl = contests?.[type]?.link || 'https://leetcode.com/contest/';
+    chrome.tabs.create({ url: contestUrl });
   }
 });
 
@@ -213,13 +357,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     });
     return true; // Keep channel open for async response
+  } else if (request.action === 'update_contest_alarms') {
+    syncContestAlarms().then(() => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
 
-// Alarm Listener (every 60 mins)
-chrome.alarms.onAlarm.addListener((alarm) => {
+// Alarm Listener (every 60 mins check + precise contest alarms)
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     checkLeetCodeDaily(false);
+  } else if (alarm.name === 'contest_alarm_weekly' || alarm.name === 'contest_alarm_biweekly') {
+    const type = alarm.name.replace('contest_alarm_', '');
+    const { contests, lang = 'zh' } = await chrome.storage.local.get(['contests', 'lang']);
+    const contest = contests?.[type];
+
+    if (contest) {
+      const isZh = lang === 'zh';
+      const titleName = contest.title || (type === 'biweekly' ? 'Biweekly Contest' : 'Weekly Contest');
+      chrome.notifications.create(`contest_notify_${type}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: isZh ? 'LeetCode 競賽即將於 1 小時後開始！' : 'LeetCode Contest Starting in 1 Hour!',
+        message: isZh
+          ? `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`
+          : `【${titleName}】starts in 60 minutes. Click to join now!`,
+        priority: 2
+      });
+    }
   }
 });
 

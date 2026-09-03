@@ -57,6 +57,41 @@
         </div>
       </div>
     </section>
+
+    <!-- Contests Section -->
+    <section class="contest-section" id="contestSection">
+      <div class="section-title-row">
+        <span class="section-title" id="contestSectionTitle">周賽活動</span>
+      </div>
+
+      <!-- Weekly Contest Card -->
+      <div class="contest-card" id="weeklyCard">
+        <div class="contest-main">
+          <a class="contest-link" id="weeklyLink" href="https://leetcode.com/contest/" target="_blank" rel="noopener noreferrer">
+            <span class="contest-title" id="weeklyTitle">Weekly Contest</span>
+          </a>
+          <span class="contest-time" id="weeklyCountdown">計算中...</span>
+        </div>
+        <label class="reminder-label" title="開始前 1 小時發送桌面推播提醒">
+          <input type="checkbox" id="weeklyReminderCheckbox" class="reminder-checkbox" checked>
+          <span class="checkbox-text" id="weeklyReminderText">1h 前提醒</span>
+        </label>
+      </div>
+
+      <!-- Biweekly Contest Card -->
+      <div class="contest-card" id="biweeklyCard">
+        <div class="contest-main">
+          <a class="contest-link" id="biweeklyLink" href="https://leetcode.com/contest/" target="_blank" rel="noopener noreferrer">
+            <span class="contest-title" id="biweeklyTitle">Biweekly Contest</span>
+          </a>
+          <span class="contest-time" id="biweeklyCountdown">計算中...</span>
+        </div>
+        <label class="reminder-label" title="開始前 1 小時發送桌面推播提醒">
+          <input type="checkbox" id="biweeklyReminderCheckbox" class="reminder-checkbox" checked>
+          <span class="checkbox-text" id="biweeklyReminderText">1h 前提醒</span>
+        </label>
+      </div>
+    </section>
   </div>
 
   <script src="popup.js"></script>
