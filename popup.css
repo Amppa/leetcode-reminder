@@ -154,6 +154,7 @@ body {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   width: fit-content;
 }
 
@@ -236,10 +237,11 @@ body {
 .difficulty-tag {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 12px; /* 膠囊型 */
+  padding: 4px 10px;
+  border-radius: 20px; /* 膠囊型 */
+  line-height: 1.2;
   width: fit-content;
 }
 
