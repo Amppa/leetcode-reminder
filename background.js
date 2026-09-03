@@ -28,18 +28,14 @@ const GRAPHQL_QUERY = JSON.stringify({
 // Update extension icon badge
 async function updateBadge(status) {
   try {
-    if (status === 'Finish') {
-      await chrome.action.setBadgeText({ text: 'OK' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#10B981' }); // Green
+    if (status === 'Finish' || status === 'error') {
+      await chrome.action.setBadgeText({ text: '' });
     } else if (status === 'not_logged_in') {
       await chrome.action.setBadgeText({ text: '!' });
       await chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' }); // Amber
-    } else if (status === 'error') {
-      await chrome.action.setBadgeText({ text: 'ERR' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#EF4444' }); // Red
     } else {
-      // Unfinished daily question
-      await chrome.action.setBadgeText({ text: 'TODO' });
+      // Unfinished daily question (NotStart)
+      await chrome.action.setBadgeText({ text: '!' });
       await chrome.action.setBadgeBackgroundColor({ color: '#EF4444' }); // Red
     }
   } catch (err) {
