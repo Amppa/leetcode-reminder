@@ -1,22 +1,72 @@
-// Pure Vanilla JS (<3KB) for LeetCode Reminder Popup
-// Zero dependencies, instant render
+// Pure Vanilla JS (<4KB) for LeetCode Reminder Popup
+// Zero external dependencies, instant render
+
+const I18N = {
+  zh: {
+    langBtn: 'EN',
+    langBtnTitle: '切換為英文 / Switch to English',
+    refreshTitle: '立即重新檢查',
+    subtitle: '每日挑戰狀態追蹤',
+    status_finish: '今日已解題完成！',
+    status_pending: '今日尚未完成',
+    status_not_logged_in: '未登入 LeetCode',
+    status_error: '檢查連線異常',
+    status_loading: '載入中...',
+    title_default: '今日題目',
+    title_not_logged_in: '請點擊此處登入 LeetCode 帳號',
+    title_error: '無法取得題目資訊，請檢查網路或稍後重試',
+    label_last_check: '上次檢查',
+    label_reset_countdown: 'UTC 00:00 換日',
+    tag_solved: 'Solved',
+    tag_todo: 'Todo',
+    tag_auth: 'Auth',
+    tag_error: 'Error',
+    time_remaining: (h, m) => `剩 ${h}小時${m}分`
+  },
+  en: {
+    langBtn: '中',
+    langBtnTitle: 'Switch to Chinese / 切換為中文',
+    refreshTitle: 'Check status now',
+    subtitle: 'Daily Challenge Tracker',
+    status_finish: 'Completed today!',
+    status_pending: 'Not completed yet',
+    status_not_logged_in: 'Not logged in',
+    status_error: 'Connection error',
+    status_loading: 'Loading...',
+    title_default: 'Daily Challenge',
+    title_not_logged_in: 'Click here to log in to LeetCode',
+    title_error: 'Unable to fetch challenge. Please retry',
+    label_last_check: 'Last checked',
+    label_reset_countdown: 'Next UTC 00:00',
+    tag_solved: 'Solved',
+    tag_todo: 'Todo',
+    tag_auth: 'Auth',
+    tag_error: 'Error',
+    time_remaining: (h, m) => `${h}h ${m}m left`
+  }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
+  const subtitle = document.getElementById('subtitle');
+  const langBtn = document.getElementById('langBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
   const statusBadge = document.getElementById('statusBadge');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
   const difficultyTag = document.getElementById('difficultyTag');
   const problemTitle = document.getElementById('problemTitle');
+  const labelLastCheck = document.getElementById('labelLastCheck');
   const lastCheckTime = document.getElementById('lastCheckTime');
+  const labelResetCountdown = document.getElementById('labelResetCountdown');
   const resetCountdown = document.getElementById('resetCountdown');
   const problemBox = document.getElementById('problemBox');
-  const refreshBtn = document.getElementById('refreshBtn');
+
+  let currentLang = 'zh';
+  let cachedData = {};
 
   // Calculate remaining time until next UTC 00:00 and format local reset hour
   function updateResetTime() {
     const now = new Date();
-
-    // Get elapsed seconds in current UTC day
     const utcHours = now.getUTCHours();
     const utcMinutes = now.getUTCMinutes();
     const utcSeconds = now.getUTCSeconds();
@@ -26,18 +76,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const remHours = Math.floor(remainingSeconds / 3600);
     const remMinutes = Math.floor((remainingSeconds % 3600) / 60);
 
-    // Compute next UTC 00:00 Date to show local equivalent time
     const nextResetDate = new Date(now.getTime() + remainingSeconds * 1000);
     const localHour = String(nextResetDate.getHours()).padStart(2, '0');
     const localMin = String(nextResetDate.getMinutes()).padStart(2, '0');
 
     if (resetCountdown) {
-      resetCountdown.textContent = `${localHour}:${localMin} (剩 ${remHours}小時${remMinutes}分)`;
+      const t = I18N[currentLang];
+      resetCountdown.textContent = `${localHour}:${localMin} (${t.time_remaining(remHours, remMinutes)})`;
     }
+  }
+
+  // Apply language strings to static & dynamic UI elements
+  function applyLanguage() {
+    const t = I18N[currentLang];
+    if (langBtn) {
+      langBtn.textContent = t.langBtn;
+      langBtn.title = t.langBtnTitle;
+    }
+    if (refreshBtn) refreshBtn.title = t.refreshTitle;
+    if (subtitle) subtitle.textContent = t.subtitle;
+    if (labelLastCheck) labelLastCheck.textContent = t.label_last_check;
+    if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
   }
 
   // Render UI with cached data
   function renderData(data = {}) {
+    cachedData = data;
     const {
       isLoggedIn,
       lastStatus,
@@ -48,43 +112,45 @@ document.addEventListener('DOMContentLoaded', () => {
       questionLink
     } = data;
 
-    // Reset classes
+    const t = I18N[currentLang];
+    applyLanguage();
+
     statusBadge.className = 'status-badge';
 
     const formattedTitle = questionId && title
       ? `${questionId}. ${title}`
-      : (title || '今日題目');
+      : (title || t.title_default);
 
     if (isLoggedIn === false || lastStatus === 'not_logged_in') {
       const loginUrl = 'https://leetcode.com/accounts/login/';
       statusBadge.classList.add('warning');
-      statusText.textContent = '未登入 LeetCode';
-      difficultyTag.textContent = 'Auth';
+      statusText.textContent = t.status_not_logged_in;
+      difficultyTag.textContent = t.tag_auth;
       difficultyTag.className = 'difficulty-tag';
-      problemTitle.textContent = '請點擊此處登入 LeetCode 帳號';
+      problemTitle.textContent = t.title_not_logged_in;
       if (problemBox) problemBox.href = loginUrl;
     } else if (lastStatus === 'Finish') {
       const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('success');
-      statusText.textContent = '今日已解題完成！';
-      difficultyTag.textContent = difficulty || 'Solved';
+      statusText.textContent = t.status_finish;
+      difficultyTag.textContent = difficulty || t.tag_solved;
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
       problemTitle.textContent = formattedTitle;
       if (problemBox) problemBox.href = targetUrl;
     } else if (lastStatus === 'error') {
       const allUrl = 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('warning');
-      statusText.textContent = '檢查連線異常';
-      difficultyTag.textContent = 'Error';
+      statusText.textContent = t.status_error;
+      difficultyTag.textContent = t.tag_error;
       difficultyTag.className = 'difficulty-tag';
-      problemTitle.textContent = '無法取得題目資訊，請檢查網路或稍後重試';
+      problemTitle.textContent = t.title_error;
       if (problemBox) problemBox.href = allUrl;
     } else {
       // Unfinished
       const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('pending');
-      statusText.textContent = '今日尚未完成';
-      difficultyTag.textContent = difficulty || 'Normal';
+      statusText.textContent = t.status_pending;
+      difficultyTag.textContent = difficulty || t.tag_todo;
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
       problemTitle.textContent = formattedTitle;
       if (problemBox) problemBox.href = targetUrl;
@@ -97,12 +163,35 @@ document.addEventListener('DOMContentLoaded', () => {
     updateResetTime();
   }
 
-  // 1. Read immediate cached data from storage for instant display
-  chrome.storage.local.get(null, (data) => {
-    renderData(data);
+  // 1. Load language preference & cached data
+  chrome.storage.local.get(null, (items) => {
+    if (items && items.lang) {
+      currentLang = items.lang;
+    }
+    renderData(items || {});
+
+    // If no status was ever checked or recorded, trigger background check automatically
+    if (!items || !items.lastStatus) {
+      if (refreshBtn) refreshBtn.classList.add('spinning');
+      chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
+        if (refreshBtn) refreshBtn.classList.remove('spinning');
+        if (response && response.data) {
+          renderData(response.data);
+        }
+      });
+    }
   });
 
-  // 2. Manual Refresh trigger
+  // 2. Language switch click
+  if (langBtn) {
+    langBtn.addEventListener('click', () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      chrome.storage.local.set({ lang: currentLang });
+      renderData(cachedData);
+    });
+  }
+
+  // 3. Manual Refresh trigger
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       refreshBtn.classList.add('spinning');

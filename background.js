@@ -56,6 +56,9 @@ function setupAlarm() {
 async function checkLeetCodeDaily(forceCheck = false) {
   const todayUtc = getUtcTodayString();
 
+  // 0. Language preference
+  const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
+
   // 1. Storage-First Check: If already finished today (UTC) and not forced, skip network call completely
   if (!forceCheck) {
     const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
@@ -91,12 +94,14 @@ async function checkLeetCodeDaily(forceCheck = false) {
     });
     await updateBadge('not_logged_in');
 
-    // Notify user to log in
+    // Notify user to log in (i18n)
     chrome.notifications.create(NOTIFICATION_ID, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: 'LeetCode 提醒：未登入',
-      message: '尚未偵測到 LeetCode 登入狀態，請點擊登入以追蹤每日挑戰解題進度。',
+      title: userLang === 'en' ? 'LeetCode Reminder: Not Logged In' : 'LeetCode 提醒：未登入',
+      message: userLang === 'en'
+        ? 'Not logged in to LeetCode. Click to log in and track your daily challenge!'
+        : '尚未偵測到 LeetCode 登入狀態，請點擊登入以追蹤每日挑戰解題進度。',
       priority: 1
     });
     return;
@@ -161,12 +166,18 @@ async function checkLeetCodeDaily(forceCheck = false) {
       await chrome.storage.local.set(updatePayload);
       await updateBadge('NotStart');
 
-      // Show hourly reminder notification
+      // Show hourly reminder notification (i18n)
+      const qPrefix = question?.frontendQuestionId ? `${question.frontendQuestionId}. ` : '';
+      const qTitle = question?.title || (userLang === 'en' ? 'Today\'s Challenge' : '今日題目');
+      const qDiff = question?.difficulty ? ` [${question.difficulty}]` : '';
+
       chrome.notifications.create(NOTIFICATION_ID, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
-        title: 'LeetCode 每日一題尚未完成！',
-        message: `${question?.frontendQuestionId ? question.frontendQuestionId + '. ' : ''}${question?.title || '今日題目'} [${question?.difficulty || ''}]\n點擊立即前往解題！`,
+        title: userLang === 'en' ? 'LeetCode Daily Challenge Unfinished!' : 'LeetCode 每日一題尚未完成！',
+        message: userLang === 'en'
+          ? `${qPrefix}${qTitle}${qDiff}\nClick to solve it now!`
+          : `${qPrefix}${qTitle}${qDiff}\n點擊立即前往解題！`,
         priority: 2
       });
     }
