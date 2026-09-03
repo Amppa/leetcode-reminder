@@ -1,0 +1,10 @@
+{
+  "appName": {
+    "message": "LeetCode Reminder",
+    "description": "擴充功能名稱"
+  },
+  "appDesc": {
+    "message": "極簡 LeetCode 每日一題與周賽提醒。",
+    "description": "擴充功能簡短說明"
+  }
+}

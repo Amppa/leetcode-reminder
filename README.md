@@ -1,36 +1,41 @@
-# LeetCode Daily Reminder (Ultra-Low Overhead)
+# LeetCode Reminder
 
-An ultra-lightweight, battery-friendly Chrome extension (Manifest V3) that checks your LeetCode Daily Challenge progress in the background and sends hourly notifications if unfinished.
+An ultra-lightweight, battery-friendly Chrome extension (Manifest V3) that tracks your LeetCode Daily Challenge progress and Weekly/Biweekly contest schedules, sending timely notifications when action is needed.
 
 ## Key Features
 
 - **Extreme Performance & Zero Persistent RAM**:
-  - Built with 100% pure Vanilla JS & micro-CSS without Webpack, React, or third-party bloatware. Total codebase is under 15 KB (reduced by 99% compared to traditional extension bundles).
-  - Designed for Manifest V3 non-persistent Service Worker: completely suspends to 0 MB RAM when idle.
+  - Built with 100% pure Vanilla JS & CSS without Webpack, React, or third-party bloatware. Total codebase is under 20 KB (reduced by 99% compared to typical extension bundles).
+  - Built for Manifest V3 non-persistent Service Worker: completely suspends to 0 MB RAM when idle.
 - **Silent Background Query**:
-  - Uses direct background GraphQL requests without opening invisible tabs or consuming browser window resources.
-- **Fix Duplicate Tabs Bug**:
-  - Properly handles global notification click listener to guarantee opening only a single daily challenge tab.
-- **Strict UTC 00:00 Reset Synchronization**:
-  - Synchronizes daily reset strictly at UTC 00:00 (International Date Line standard).
-  - Storage-first check: skips redundant network queries once solved for today.
-- **Visual Status Badge**:
-  - `OK` (Green): Today's challenge is completed.
-  - `TODO` (Red): Unfinished challenge.
-  - `!` (Amber): Log in session required.
-- **Minimalist Dark UI Popup**:
-  - Instant display of question ID, title, difficulty tag (Easy, Medium, Hard), and countdown to UTC 00:00 in your local time.
+  - Direct GraphQL queries with single-request consolidation for both daily challenge and contest info.
+  - Zero invisible tabs and zero DOM overhead.
+- **Weekly & Biweekly Contest Tracking**:
+  - Independent contest cards showing upcoming Weekly and Biweekly contests.
+  - Live dynamic countdown timer (`Starts in Xd Xh` / `Starts in Xh Xm`).
+  - Optional 1-hour before desktop notifications with dedicated reminder toggles.
+- **Daily Challenge & Status Badges**:
+  - Unfinished challenge (`NotStart`): Red `!` badge icon and hourly notifications.
+  - Finished challenge (`Finish`): Cleans badge text and suppresses redundant network calls.
+  - Not logged in (`not_logged_in`): Amber `!` badge icon with prompt to sign in.
+- **Bilingual Support (i18n)**:
+  - Instant one-click English / Traditional Chinese toggle (`EN` / `中`).
+  - Localized notifications, cards, countdowns, and labels.
+- **Duplicate Tab Prevention**:
+  - Properly managed notification click handlers guaranteeing single-tab focus.
 
 ## Installation
 
-1. Open Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** in the top-right corner.
-3. Click **Load unpacked** and select this directory (`leetcode-reminder`).
-4. Pin the extension icon to your toolbar for quick status monitoring.
+1. Clone or download this repository.
+2. Open Chrome and navigate to `chrome://extensions/`.
+3. Enable **Developer mode** in the top-right corner.
+4. Click **Load unpacked** and select the repository root folder.
+5. Pin the extension icon to your toolbar for quick status monitoring.
 
 ## Permissions
 
-- `alarms`: Periodic hourly checks.
-- `cookies`: Reads `LEETCODE_SESSION` cookie from `leetcode.com` to authenticate status.
-- `notifications`: Alerts user when daily problem is unfinished or login is missing.
-- `storage`: Caches daily state to prevent unnecessary network calls.
+- `alarms`: Periodic hourly checks and scheduled contest reminders.
+- `cookies`: Reads `LEETCODE_SESSION` from `leetcode.com` to check personal daily progress.
+- `notifications`: Alerts user for unfinished daily challenges and upcoming contests.
+- `storage`: Caches challenge states and user preferences (language, reminder toggles).
+
