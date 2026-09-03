@@ -1,20 +1,38 @@
 /* Ultra-lightweight Vanilla CSS (<2.5KB) with sleek dark modern aesthetics */
 :root {
+  /* 1. Base / Surface tokens */
   --bg-primary: #18181b;
   --bg-card: #27272a;
-  --bg-hover: #3f3f46;
-  --text-main: #f4f4f5;
-  --text-muted: #a1a1aa;
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
-  --accent-yellow: #f59e0b;
-  --accent-red: #ef4444;
-  --color-easy: #00b8a3;
-  --color-medium: #ffc01e;
-  --color-hard: #ff375f;
+  --bg-card-subtle: rgba(0, 0, 0, 0.2);
+  --bg-card-hover: rgba(255, 255, 255, 0.05);
+
   --border-subtle: #3f3f46;
+  --border-card-subtle: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --border-divider: rgba(255, 255, 255, 0.06);
+
+  --text-main: #f4f4f5;
+  --text-value: #e4e4e7;
+  --text-muted: #a1a1aa;
+
+  /* 2. Status tokens */
+  --status-success: #10b981;
+  --status-success-bg: rgba(16, 185, 129, 0.15);
+  --status-pending: #ef4444;
+  --status-pending-bg: rgba(239, 68, 68, 0.15);
+  --status-warning: #f59e0b;
+  --status-warning-bg: rgba(245, 158, 11, 0.15);
+
+  /* 3. LeetCode Difficulty tokens */
+  --difficulty-easy: #00b8a3;
+  --difficulty-easy-bg: rgba(0, 184, 163, 0.12);
+  --difficulty-medium: #ffc01e;
+  --difficulty-medium-bg: rgba(255, 192, 30, 0.12);
+  --difficulty-hard: #ff375f;
+  --difficulty-hard-bg: rgba(255, 55, 95, 0.12);
 }
 
+/* Reset & Base */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -31,13 +49,14 @@ body {
   user-select: none;
 }
 
+/* Layout Shell */
 .card-container {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* Header */
+/* Header Component */
 .header {
   display: flex;
   align-items: center;
@@ -78,7 +97,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .icon-btn:hover {
@@ -90,17 +109,7 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Status Section */
+/* Status Card Component */
 .status-section {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -129,51 +138,51 @@ body {
   background-color: var(--text-muted);
 }
 
-/* Status States */
+/* Status Variations */
 .status-badge.success {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: var(--accent-green);
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
 }
 
 .status-badge.success .status-dot {
-  background-color: var(--accent-green);
-  box-shadow: 0 0 8px var(--accent-green);
+  background-color: var(--status-success);
+  box-shadow: 0 0 8px var(--status-success);
 }
 
 .status-badge.pending {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: var(--accent-red);
+  background-color: var(--status-pending-bg);
+  color: var(--status-pending);
 }
 
 .status-badge.pending .status-dot {
-  background-color: var(--accent-red);
-  box-shadow: 0 0 8px var(--accent-red);
+  background-color: var(--status-pending);
+  box-shadow: 0 0 8px var(--status-pending);
 }
 
 .status-badge.warning {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: var(--accent-yellow);
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning);
 }
 
 .status-badge.warning .status-dot {
-  background-color: var(--accent-yellow);
+  background-color: var(--status-warning);
 }
 
-/* Problem Box */
+/* Problem Box Component */
 .problem-box {
   display: block;
   text-decoration: none;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-card-subtle);
   border-radius: 8px;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-card-subtle);
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .problem-box:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
   transform: translate(-2px, -2px);
 }
 
@@ -201,19 +210,20 @@ body {
   border-radius: 4px;
 }
 
+/* LeetCode Difficulty Variations */
 .difficulty-tag.Easy {
-  color: var(--color-easy);
-  background: rgba(0, 184, 163, 0.12);
+  color: var(--difficulty-easy);
+  background: var(--difficulty-easy-bg);
 }
 
 .difficulty-tag.Medium {
-  color: var(--color-medium);
-  background: rgba(255, 192, 30, 0.12);
+  color: var(--difficulty-medium);
+  background: var(--difficulty-medium-bg);
 }
 
 .difficulty-tag.Hard {
-  color: var(--color-hard);
-  background: rgba(255, 55, 95, 0.12);
+  color: var(--difficulty-hard);
+  background: var(--difficulty-hard-bg);
 }
 
 .problem-title {
@@ -224,12 +234,12 @@ body {
   word-break: break-word;
 }
 
-/* Meta rows */
+/* Meta Info Component */
 .meta-info {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-divider);
   padding-top: 8px;
 }
 
@@ -244,6 +254,17 @@ body {
 }
 
 .meta-value {
-  color: #e4e4e7;
+  color: var(--text-value);
   font-weight: 500;
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
