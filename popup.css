@@ -290,41 +290,14 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  padding: 10px 12px;
 }
 
 .contest-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-card-subtle);
-  border: 1px solid var(--border-card-subtle);
-  border-radius: 8px;
-  padding: 8px 10px;
   gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.contest-card:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover);
 }
 
 .contest-main {

@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const problemBox = document.getElementById('problemBox');
 
   // Contest DOM elements
-  const contestSectionTitle = document.getElementById('contestSectionTitle');
   const weeklyLink = document.getElementById('weeklyLink');
   const weeklyTitle = document.getElementById('weeklyTitle');
   const weeklyCountdown = document.getElementById('weeklyCountdown');
@@ -101,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
 
     // Contests section i18n
-    if (contestSectionTitle) contestSectionTitle.textContent = t.contest_section_title;
     if (weeklyReminderText) weeklyReminderText.textContent = t.contest_reminder_text;
     if (biweeklyReminderText) biweeklyReminderText.textContent = t.contest_reminder_text;
   }
