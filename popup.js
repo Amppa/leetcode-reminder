@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusBadge = document.getElementById('statusBadge');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
-  const problemId = document.getElementById('problemId');
   const difficultyTag = document.getElementById('difficultyTag');
   const problemTitle = document.getElementById('problemTitle');
   const lastCheckTime = document.getElementById('lastCheckTime');
@@ -52,11 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset classes
     statusBadge.className = 'status-badge';
 
+    const formattedTitle = questionId && title
+      ? `${questionId}. ${title}`
+      : (title || '今日題目');
+
     if (isLoggedIn === false || lastStatus === 'not_logged_in') {
       const loginUrl = 'https://leetcode.com/accounts/login/';
       statusBadge.classList.add('warning');
       statusText.textContent = '未登入 LeetCode';
-      problemId.textContent = '--';
       difficultyTag.textContent = 'Auth';
       difficultyTag.className = 'difficulty-tag';
       problemTitle.textContent = '請點擊此處登入 LeetCode 帳號';
@@ -65,15 +67,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('success');
       statusText.textContent = '今日已解題完成！';
-      problemId.textContent = questionId ? `#${questionId}` : 'Daily';
       difficultyTag.textContent = difficulty || 'Solved';
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
-      problemTitle.textContent = title || '今日題目已搞定';
+      problemTitle.textContent = formattedTitle;
       if (problemBox) problemBox.href = targetUrl;
     } else if (lastStatus === 'error') {
       const allUrl = 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('warning');
       statusText.textContent = '檢查連線異常';
+      difficultyTag.textContent = 'Error';
+      difficultyTag.className = 'difficulty-tag';
       problemTitle.textContent = '無法取得題目資訊，請檢查網路或稍後重試';
       if (problemBox) problemBox.href = allUrl;
     } else {
@@ -81,10 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('pending');
       statusText.textContent = '今日尚未完成';
-      problemId.textContent = questionId ? `#${questionId}` : 'Daily';
       difficultyTag.textContent = difficulty || 'Normal';
       difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
-      problemTitle.textContent = title || '尚未解題';
+      problemTitle.textContent = formattedTitle;
       if (problemBox) problemBox.href = targetUrl;
     }
 
