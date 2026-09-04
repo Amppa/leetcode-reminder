@@ -4,6 +4,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const subtitle = document.getElementById('subtitle');
   const langBtn = document.getElementById('langBtn');
+  const themeBtn = document.getElementById('themeBtn');
+  const themeIcon = document.getElementById('themeIcon');
   const refreshBtn = document.getElementById('refreshBtn');
   const statusBadge = document.getElementById('statusBadge');
   const statusDot = document.getElementById('statusDot');
@@ -39,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let currentLang = 'zh';
+  let currentTheme = 'dark';
   let cachedData = {};
 
   // Format countdown string for contests
@@ -108,6 +111,37 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const type of ['weekly', 'biweekly']) {
       contestUI[type].reminders['1h'].text.textContent = t.contest_reminder_1h;
       contestUI[type].reminders['3m'].text.textContent = t.contest_reminder_3m;
+    }
+
+    updateThemeUI();
+  }
+
+  // Apply theme to document
+  function applyTheme(theme) {
+    currentTheme = theme;
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    updateThemeUI();
+  }
+
+  // Update theme toggle button icon and tooltip
+  function updateThemeUI() {
+    const t = I18N[currentLang];
+    if (themeBtn && themeIcon) {
+      if (currentTheme === 'light') {
+        // Light theme active -> show Moon icon to switch to dark
+        themeIcon.innerHTML = '<path d="M12.3 2a10 10 0 0 0-.19 2 10 10 0 0 0 10 10c.68 0 1.35-.07 2-.19A10 10 0 1 1 12.3 2z"/>';
+        themeBtn.title = t.theme_to_dark;
+        themeBtn.setAttribute('aria-label', t.theme_to_dark);
+      } else {
+        // Dark theme active -> show Sun icon to switch to light
+        themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0-1.41-1.41l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0-1.41-1.41l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>';
+        themeBtn.title = t.theme_to_light;
+        themeBtn.setAttribute('aria-label', t.theme_to_light);
+      }
     }
   }
 
@@ -221,11 +255,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
   }
 
-  // 1. Load language preference & cached data
+  // 1. Load language & theme preferences, and cached data
   chrome.storage.local.get(null, (items) => {
     if (items && items.lang) {
       currentLang = items.lang;
     }
+    applyTheme(items?.theme || 'dark');
     renderData(items || {});
 
     // Auto-check on popup open if not finished today (SWR pattern)
@@ -246,6 +281,15 @@ document.addEventListener('DOMContentLoaded', () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
       chrome.storage.local.set({ lang: currentLang });
       renderData(cachedData);
+    });
+  }
+
+  // 3. Theme switch click
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(nextTheme);
+      chrome.storage.local.set({ theme: nextTheme });
     });
   }
 
