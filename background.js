@@ -221,8 +221,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
       return;
     }
 
-  // 3. Background GraphQL Request
-  try {
+    // 3. Background GraphQL Request
     const headers = {
       'Content-Type': 'application/json',
       'Referer': 'https://leetcode.com/',
