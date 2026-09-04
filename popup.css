@@ -1,23 +1,27 @@
-/* Ultra-lightweight Vanilla CSS with sleek dark modern aesthetics */
+/* ==========================================================================
+   1. DESIGN TOKENS
+   ========================================================================== */
 :root {
-  /* 1. Base / Surface tokens */
+  /* Surface & Base Colors (Dark Mode Default) */
   --bg-primary: #18181b;
   --bg-card: #27272a;
   --bg-card-subtle: rgba(0, 0, 0, 0.2);
   --bg-card-hover: rgba(255, 255, 255, 0.05);
 
+  /* Border Tokens */
   --border-subtle: #3f3f46;
   --border-card-subtle: rgba(255, 255, 255, 0.05);
   --border-hover: rgba(255, 255, 255, 0.15);
   --border-divider: rgba(255, 255, 255, 0.06);
 
+  /* Typography Colors */
   --text-main: #f4f4f5;
   --text-muted: #a1a1aa;
 
-  /* 2. Brand / Accent tokens */
+  /* Brand / Accent */
   --brand-accent: #ffa116;
 
-  /* 3. Status tokens (Note: Chrome toolbar badge colors are configured in background.js BADGE_CONFIG) */
+  /* Status Colors (Chrome badge colors configured in background.js BADGE_CONFIG) */
   --status-success: #10b981;
   --status-success-bg: rgba(16, 185, 129, 0.15);
   --status-warning: #f59e0b;
@@ -25,7 +29,7 @@
   --status-pending: #ef4444;
   --status-pending-bg: rgba(239, 68, 68, 0.15);
 
-  /* 4. LeetCode Difficulty tokens */
+  /* LeetCode Difficulty Tokens */
   --difficulty-easy: #00b8a3;
   --difficulty-easy-bg: rgba(0, 184, 163, 0.12);
   --difficulty-medium: #ffc01e;
@@ -33,28 +37,52 @@
   --difficulty-hard: #ff375f;
   --difficulty-hard-bg: rgba(255, 55, 95, 0.12);
 
+  /* Elevation / Shadows */
   --card-shadow: none;
+
+  /* Sizing & Typography Tokens (1rem = 10px) */
+  font-size: 10px;
+  --popup-width: 350px;
+  --font-size-base: 1.4rem;
+
+  /* Spacing Scale (4-tier scale) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+
+  /* Radius Tokens */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 20px;
+
+  /* Transition Tokens */
+  --transition-base: 0.2s ease;
 }
 
 [data-theme="light"] {
-  /* 1. Base / Surface tokens */
+  /* Surface & Base Colors (Light Mode) */
   --bg-primary: #f8fafc;
   --bg-card: #ffffff;
   --bg-card-subtle: #f1f5f9;
   --bg-card-hover: #e2e8f0;
 
+  /* Border Tokens */
   --border-subtle: #e2e8f0;
   --border-card-subtle: #e2e8f0;
   --border-hover: #cbd5e1;
   --border-divider: #e2e8f0;
 
+  /* Typography Colors */
   --text-main: #0f172a;
   --text-muted: #64748b;
 
-  /* 2. Brand / Accent tokens */
+  /* Brand / Accent */
   --brand-accent: #f59e0b;
 
-  /* 3. Status tokens */
+  /* Status Colors */
   --status-success: #059669;
   --status-success-bg: rgba(16, 185, 129, 0.12);
   --status-warning: #d97706;
@@ -62,7 +90,7 @@
   --status-pending: #dc2626;
   --status-pending-bg: rgba(239, 68, 68, 0.12);
 
-  /* 4. LeetCode Difficulty tokens */
+  /* LeetCode Difficulty Tokens (High contrast for light theme) */
   --difficulty-easy: #008775;
   --difficulty-easy-bg: rgba(0, 184, 163, 0.12);
   --difficulty-medium: #b45309;
@@ -70,10 +98,13 @@
   --difficulty-hard: #e11d48;
   --difficulty-hard-bg: rgba(255, 55, 95, 0.12);
 
+  /* Elevation / Shadows */
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-/* Reset & Base */
+/* ==========================================================================
+   2. BASE & RESET
+   ========================================================================== */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -82,23 +113,27 @@
 }
 
 body {
-  width: 350px;
+  width: var(--popup-width);
+  font-size: var(--font-size-base);
   background-color: var(--bg-primary);
   color: var(--text-main);
-  padding: 16px;
+  padding: var(--space-lg);
   overflow: hidden;
   user-select: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
-/* Layout Shell */
+/* ==========================================================================
+   3. LAYOUT SHELL
+   ========================================================================== */
 .card-container {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* Header Component */
 .header {
   display: flex;
   align-items: center;
@@ -114,18 +149,18 @@ body {
 .logo {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   object-fit: cover;
 }
 
 .title {
-  font-size: 16px;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.2px;
 }
 
 .subtitle {
-  font-size: 12px;
+  font-size: 1.2rem;
   color: var(--text-muted);
 }
 
@@ -135,38 +170,19 @@ body {
   gap: 6px;
 }
 
-.lang-btn {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  line-height: 1.2;
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-
-  &:hover {
-    background: var(--bg-card);
-    color: var(--text-main);
-    border-color: var(--border-hover);
-  }
-}
-
+/* ==========================================================================
+   4. BUTTONS & CONTROLS (DRY Base)
+   ========================================================================== */
+/* Header Action Buttons: Lang & Theme Toggle */
+.lang-btn,
 .theme-btn {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  padding: 3px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  line-height: 1.2;
+  transition: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
 
   &:hover {
     background: var(--bg-card);
@@ -179,31 +195,32 @@ body {
   }
 }
 
-.theme-icon {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
-  display: block;
-  transition: transform 0.3s ease;
+.lang-btn {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px var(--space-sm);
 }
 
-.refresh-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
 }
 
+/* Icon Buttons & SVG Elements */
 .icon-btn {
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   padding: 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition: color var(--transition-base), background-color var(--transition-base);
 
   &:hover {
     background: var(--bg-card);
@@ -215,38 +232,55 @@ body {
   }
 }
 
-/* Card Surface Containers (DRY base) */
+.theme-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: currentColor;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.refresh-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  display: block;
+}
+
+/* ==========================================================================
+   5. CARD SURFACES (DRY Base)
+   ========================================================================== */
 .status-section,
 .contest-section {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-md);
   box-shadow: var(--card-shadow);
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .status-section {
-  padding: 12px;
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* Badge & Tag Base (DRY base) */
+/* ==========================================================================
+   6. STATUS & DIFFICULTY BADGES (DRY Base)
+   ========================================================================== */
 .status-badge,
 .difficulty-tag {
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
+  font-size: 1.3rem;
   font-weight: 600;
-  padding: 4px 11px;
-  border-radius: 20px;
+  padding: var(--space-xs) 11px;
+  border-radius: var(--radius-full);
   line-height: 1.2;
   width: fit-content;
 }
 
-/* Status Badge Component */
 .status-badge {
   gap: 6px;
 
@@ -287,48 +321,6 @@ body {
   background-color: var(--text-muted);
 }
 
-/* Problem Box Component */
-.problem-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-decoration: none;
-  background: var(--bg-card-subtle);
-  border-radius: 8px;
-  padding: 10px;
-  border: 1px solid var(--border-card-subtle);
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--border-hover);
-    transform: translate(-2px, -2px);
-  }
-
-  &:active {
-    transform: translate(0, 0);
-  }
-}
-
-.problem-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-  line-height: 1.45;
-  word-break: break-word;
-  user-select: text;
-  /* Allow user to select & copy question title */
-}
-
-.problem-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-/* LeetCode Difficulty Variations */
 .difficulty-tag {
   &.Easy {
     color: var(--difficulty-easy);
@@ -346,37 +338,73 @@ body {
   }
 }
 
-/* Meta Info Component */
+/* ==========================================================================
+   7. DAILY CHALLENGE CARD & META INFO
+   ========================================================================== */
+.problem-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  text-decoration: none;
+  background: var(--bg-card-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  border: 1px solid var(--border-card-subtle);
+  cursor: pointer;
+  transition: background-color var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
+
+  &:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    transform: translate(-2px, -2px);
+  }
+
+  &:active {
+    transform: translate(0, 0);
+  }
+}
+
+.problem-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.45;
+  word-break: break-word;
+  user-select: text;
+}
+
+.problem-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .meta-info {
   display: flex;
   flex-direction: column;
   gap: 5px;
   border-top: 1px solid var(--border-divider);
-  padding-top: 8px;
+  padding-top: var(--space-sm);
 }
 
 .meta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.meta-label,
-.meta-value {
+  font-size: 1.2rem;
   color: var(--text-muted);
 }
 
 .meta-value-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .refresh-btn-inline {
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   line-height: 1;
 
   &:hover {
@@ -385,12 +413,14 @@ body {
   }
 }
 
-/* Contest Section Component */
+/* ==========================================================================
+   8. CONTESTS & DYNAMIC CONTROLS
+   ========================================================================== */
 .contest-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .contest-main {
@@ -414,24 +444,24 @@ body {
 }
 
 .contest-title {
-  font-size: 13px;
+  font-size: 1.3rem;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.2s ease;
+  transition: color var(--transition-base);
 }
 
 .contest-time {
-  font-size: 12px;
+  font-size: 1.2rem;
   color: var(--text-muted);
 }
 
 .contest-reminders {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   flex-shrink: 0;
 }
 
@@ -439,7 +469,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 1.2rem;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
@@ -453,16 +483,16 @@ body {
 .reminder-checkbox {
   appearance: none;
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 1.4rem;
+  height: 1.4rem;
   border: 1.5px solid var(--text-muted);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background-color: transparent;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
   margin: 0;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: border-color var(--transition-base), background-color var(--transition-base);
 
   &:hover {
     border-color: var(--text-main);
@@ -475,10 +505,10 @@ body {
     &::after {
       content: '';
       position: absolute;
-      left: 3.5px;
-      top: 1px;
-      width: 3.5px;
-      height: 7px;
+      left: 28%;
+      top: 10%;
+      width: 28%;
+      height: 52%;
       border: solid #ffffff;
       border-width: 0 1.5px 1.5px 0;
       transform: rotate(45deg);
