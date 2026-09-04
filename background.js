@@ -6,6 +6,12 @@ const CHECK_INTERVAL_MINUTES = 60;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
+// Badge color tokens (matches --status-* in popup.css)
+const BADGE_COLORS = {
+  NOT_LOGGED_IN: '#F59E0B', // Amber (--status-warning)
+  UNFINISHED: '#EF4444',    // Red (--status-pending)
+};
+
 // Get current date string in UTC (YYYY-MM-DD)
 // LeetCode resets daily coding challenge strictly at UTC 00:00
 function getUtcTodayString() {
@@ -50,11 +56,11 @@ async function updateBadge(status) {
       await chrome.action.setBadgeText({ text: '' });
     } else if (status === 'not_logged_in') {
       await chrome.action.setBadgeText({ text: '!' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' }); // Amber
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.NOT_LOGGED_IN });
     } else {
       // Unfinished daily question (NotStart)
       await chrome.action.setBadgeText({ text: '!' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#EF4444' }); // Red
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.UNFINISHED });
     }
   } catch (err) {
     console.error('[LeetCode Reminder] Failed to update badge:', err);
