@@ -273,6 +273,7 @@ body {
 .meta-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 11px;
 }
 
@@ -280,9 +281,26 @@ body {
   color: var(--text-muted);
 }
 
+.meta-value-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .meta-value {
   color: var(--text-value);
   font-weight: 500;
+}
+
+.refresh-btn-inline {
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.refresh-btn-inline:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
 }
 
 /* Contest Section Component */
