@@ -82,7 +82,7 @@
 }
 
 body {
-  width: 330px;
+  width: 350px;
   background-color: var(--bg-primary);
   color: var(--text-main);
   padding: 16px;
@@ -112,20 +112,20 @@ body {
 }
 
 .logo {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 8px;
   object-fit: cover;
 }
 
 .title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.2px;
 }
 
 .subtitle {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -139,10 +139,10 @@ body {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  padding: 3px 7px;
+  padding: 3px 8px;
   border-radius: 6px;
   cursor: pointer;
   line-height: 1.2;
@@ -159,7 +159,7 @@ body {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  padding: 3px 6px;
+  padding: 3px 7px;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
@@ -229,9 +229,9 @@ body {
 .difficulty-tag {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 4px 11px;
   border-radius: 20px;
   line-height: 1.2;
   width: fit-content;
@@ -303,10 +303,10 @@ body {
 }
 
 .problem-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
-  line-height: 1.4;
+  line-height: 1.45;
   word-break: break-word;
   user-select: text;
   /* Allow user to select & copy question title */
@@ -350,7 +350,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -405,7 +405,7 @@ body {
 }
 
 .contest-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
@@ -415,7 +415,7 @@ body {
 }
 
 .contest-time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -430,7 +430,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
@@ -444,8 +444,8 @@ body {
 .reminder-checkbox {
   appearance: none;
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   border: 1.5px solid var(--text-muted);
   border-radius: 3px;
   background-color: transparent;
@@ -466,8 +466,8 @@ body {
     &::after {
       content: '';
       position: absolute;
-      left: 3px;
-      top: 0.5px;
+      left: 3.5px;
+      top: 1px;
       width: 3.5px;
       height: 7px;
       border: solid #ffffff;
