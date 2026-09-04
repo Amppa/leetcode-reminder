@@ -156,10 +156,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const allUrl = 'https://leetcode.com/problemset/all/';
       statusBadge.classList.add('warning');
       statusText.textContent = t.status_error;
-      difficultyTag.textContent = t.tag_error;
-      difficultyTag.className = 'difficulty-tag';
-      problemTitle.textContent = t.title_error;
-      if (problemBox) problemBox.href = allUrl;
+      difficultyTag.textContent = difficulty || t.tag_error;
+      difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
+      problemTitle.textContent = title ? formattedTitle : t.title_error;
+      if (problemBox) problemBox.href = questionLink || allUrl;
     } else {
       // Unfinished
       const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
@@ -243,8 +243,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderData(items || {});
 
-    // If no status was ever checked or recorded, trigger background check automatically
-    if (!items || !items.lastStatus || !items.contests) {
+    // Cache hit check: If finished today (UTC), do not query LeetCode
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const isFinishedToday = items?.lastStatus === 'Finish' && items?.lastCompletedUtcDate === todayUtc;
+
+    // Auto-check on popup open if unfinished, unauthenticated, or cache missing
+    if (!isFinishedToday) {
       if (refreshBtn) refreshBtn.classList.add('spinning');
       chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
         if (refreshBtn) refreshBtn.classList.remove('spinning');

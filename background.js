@@ -2,9 +2,13 @@
 // Ultra-low CPU & RAM: zero persistent timers, non-persistent service worker
 
 const ALARM_NAME = 'leetcode_daily_alarm';
+const UTC_MIDNIGHT_ALARM_NAME = 'leetcode_utc_midnight_alarm';
 const CHECK_INTERVAL_MINUTES = 60;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
+
+// In-flight guard to prevent duplicate concurrent GraphQL checks
+let isChecking = false;
 
 // Badge display tokens (matches --status-* in popup.css)
 const BADGE_CONFIG = {
@@ -72,13 +76,26 @@ async function updateBadge(status) {
   }
 }
 
-// Ensure hourly alarm is set
+// Schedule precise alarm at next UTC 00:00:15 (with 15s buffer for LeetCode server rollover)
+function scheduleUtcMidnightAlarm() {
+  const now = new Date();
+  const nextMidnightUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0, 0, 15 // 15s buffer after UTC midnight
+  );
+  chrome.alarms.create(UTC_MIDNIGHT_ALARM_NAME, { when: nextMidnightUtc });
+}
+
+// Ensure hourly alarm and midnight rollover alarm are set
 function setupAlarm() {
   chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
     if (!existingAlarm) {
       chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
     }
   });
+  scheduleUtcMidnightAlarm();
 }
 
 // Fetch upcoming contests (Public API, zero login required)
@@ -142,22 +159,26 @@ async function fetchUpcomingContests() {
 
 // Check LeetCode Daily Challenge status
 async function checkLeetCodeDaily(forceCheck = false) {
-  const todayUtc = getUtcTodayString();
+  if (isChecking) return;
+  isChecking = true;
 
-  // 0. Always refresh upcoming contests
-  await fetchUpcomingContests();
+  try {
+    const todayUtc = getUtcTodayString();
 
-  // 1. Language preference
-  const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
-
-  // 2. Storage-First Check: If already finished today (UTC) and not forced, skip daily question network call
-  if (!forceCheck) {
-    const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
-    if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
-      await updateBadge('Finish');
-      return;
+    // 1. Storage-First Check: If already finished today (UTC) and not forced, complete cache hit
+    if (!forceCheck) {
+      const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
+      if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
+        await updateBadge('Finish');
+        return;
+      }
     }
-  }
+
+    // 2. Refresh upcoming contests
+    await fetchUpcomingContests();
+
+    // 3. Language preference
+    const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
 
   // 3. Cookie Check: Check LEETCODE_SESSION & csrftoken
   let sessionCookie = null;
@@ -306,7 +327,14 @@ async function checkLeetCodeDaily(forceCheck = false) {
       lastStatus: 'error',
       lastCheckTime: getFormattedTime()
     });
-    await updateBadge('error');
+    // Soft error: maintain reminder badge if today is unfinished
+    const prev = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
+    const todayUtc = getUtcTodayString();
+    if (prev?.lastStatus !== 'Finish' || prev?.lastCompletedUtcDate !== todayUtc) {
+      await updateBadge('NotStart');
+    }
+  } finally {
+    isChecking = false;
   }
 }
 
@@ -403,9 +431,12 @@ async function sendContestNotification(type, offsetKey = '1h') {
   });
 }
 
-// Alarm Listener (every 60 mins check + precise contest alarms)
+// Alarm Listener (every 60 mins check + midnight rollover + precise contest alarms)
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
+    checkLeetCodeDaily(false);
+  } else if (alarm.name === UTC_MIDNIGHT_ALARM_NAME) {
+    scheduleUtcMidnightAlarm();
     checkLeetCodeDaily(false);
   } else if (alarm.name.startsWith('contest_alarm_')) {
     const parts = alarm.name.replace('contest_alarm_', '').split('_');
