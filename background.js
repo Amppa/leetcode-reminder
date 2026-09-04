@@ -388,6 +388,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Send contest reminder notification
+async function sendContestNotification(type, offsetKey = '1h') {
+  const { lang = 'zh' } = await chrome.storage.local.get('lang');
+  const is3m = offsetKey === '3m';
+  const time = lang === 'zh' ? (is3m ? '3 分鐘' : '1 小時') : (is3m ? '3 minutes' : '1 hour');
+
+  chrome.notifications.create(`contest_notify_${type}_${offsetKey}`, {
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: lang === 'zh' ? `LeetCode 競賽即將於 ${time}後開始！` : `LeetCode Contest starting in ${time}!`,
+    message: lang === 'zh' ? '點擊前往競賽頁面' : 'Click to open contest page',
+    priority: 2
+  });
+}
+
 // Alarm Listener (every 60 mins check + precise contest alarms)
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
@@ -396,35 +411,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const parts = alarm.name.replace('contest_alarm_', '').split('_');
     const type = parts[0];
     const offsetKey = parts[1] || '1h';
-
-    const { contests, lang = 'zh' } = await chrome.storage.local.get(['contests', 'lang']);
-    const contest = contests?.[type];
-
-    if (contest) {
-      const isZh = lang === 'zh';
-      const titleName = contest.title || (type === 'biweekly' ? 'Biweekly Contest' : 'Weekly Contest');
-      const is3m = offsetKey === '3m';
-
-      const title = isZh
-        ? (is3m ? 'LeetCode 競賽即將於 3 分鐘後開始！' : 'LeetCode 競賽即將於 1 小時後開始！')
-        : (is3m ? 'LeetCode Contest Starting in 3 Minutes!' : 'LeetCode Contest Starting in 1 Hour!');
-
-      const message = isZh
-        ? (is3m
-          ? `【${titleName}】倒數 3 分鐘開賽，請做好準備！點擊前往競賽頁面！`
-          : `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`)
-        : (is3m
-          ? `【${titleName}】starts in 3 minutes. Get ready! Click to join now!`
-          : `【${titleName}】starts in 60 minutes. Click to join now!`);
-
-      chrome.notifications.create(`contest_notify_${type}_${offsetKey}`, {
-        type: 'basic',
-        iconUrl: 'icons/icon128.png',
-        title,
-        message,
-        priority: 2
-      });
-    }
+    await sendContestNotification(type, offsetKey);
   }
 });
 
