@@ -15,7 +15,7 @@
   --text-value: #e4e4e7;
   --text-muted: #a1a1aa;
 
-  /* 2. Status tokens (Note: Chrome toolbar badge colors are configured in background.js BADGE_COLORS) */
+  /* 2. Status tokens (Note: Chrome toolbar badge colors are configured in background.js BADGE_CONFIG) */
   --status-success: #10b981;
   --status-success-bg: rgba(16, 185, 129, 0.15);
   --status-pending: #ef4444;

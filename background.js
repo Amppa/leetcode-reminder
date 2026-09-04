@@ -6,8 +6,10 @@ const CHECK_INTERVAL_MINUTES = 60;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
-// Badge color tokens (matches --status-* in popup.css)
-const BADGE_COLORS = {
+// Badge display tokens (matches --status-* in popup.css)
+const BADGE_CONFIG = {
+  TEXT: ' !',
+  TEXT_COLOR: '#FFFFFF',
   NOT_LOGGED_IN: '#F59E0B', // Amber (--status-warning)
   UNFINISHED: '#EF4444',    // Red (--status-pending)
 };
@@ -55,12 +57,15 @@ async function updateBadge(status) {
     if (status === 'Finish' || status === 'error') {
       await chrome.action.setBadgeText({ text: '' });
     } else if (status === 'not_logged_in') {
-      await chrome.action.setBadgeText({ text: '!' });
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.NOT_LOGGED_IN });
+      await chrome.action.setBadgeText({ text: BADGE_CONFIG.TEXT });
+      await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.NOT_LOGGED_IN });
+
     } else {
       // Unfinished daily question (NotStart)
-      await chrome.action.setBadgeText({ text: '!' });
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.UNFINISHED });
+      await chrome.action.setBadgeText({ text: BADGE_CONFIG.TEXT });
+      await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.UNFINISHED });
     }
   } catch (err) {
     console.error('[LeetCode Reminder] Failed to update badge:', err);
@@ -406,11 +411,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
       const message = isZh
         ? (is3m
-            ? `【${titleName}】倒數 3 分鐘開賽，請做好準備！點擊前往競賽頁面！`
-            : `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`)
+          ? `【${titleName}】倒數 3 分鐘開賽，請做好準備！點擊前往競賽頁面！`
+          : `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`)
         : (is3m
-            ? `【${titleName}】starts in 3 minutes. Get ready! Click to join now!`
-            : `【${titleName}】starts in 60 minutes. Click to join now!`);
+          ? `【${titleName}】starts in 3 minutes. Get ready! Click to join now!`
+          : `【${titleName}】starts in 60 minutes. Click to join now!`);
 
       chrome.notifications.create(`contest_notify_${type}_${offsetKey}`, {
         type: 'basic',
