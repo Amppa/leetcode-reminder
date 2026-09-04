@@ -1,4 +1,4 @@
-/* Ultra-lightweight Vanilla CSS (<2.5KB) with sleek dark modern aesthetics */
+/* Ultra-lightweight Vanilla CSS with sleek dark modern aesthetics */
 :root {
   /* 1. Base / Surface tokens */
   --bg-primary: #18181b;
@@ -106,14 +106,14 @@ body {
   padding: 3px 7px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
   line-height: 1.2;
-}
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 
-.lang-btn:hover {
-  background: var(--bg-card);
-  color: var(--text-main);
-  border-color: var(--border-hover);
+  &:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-hover);
+  }
 }
 
 .icon-btn {
@@ -126,39 +126,79 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
+
+  &:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+  }
+
+  &.spinning svg {
+    animation: spin 0.8s linear infinite;
+  }
 }
 
-.icon-btn:hover {
-  background: var(--bg-card);
-  color: var(--text-main);
-}
-
-.icon-btn.spinning svg {
-  animation: spin 0.8s linear infinite;
-}
-
-/* Status Card Component */
-.status-section {
+/* Card Surface Containers (DRY base) */
+.status-section,
+.contest-section {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.status-section {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.status-badge {
+/* Badge & Tag Base (DRY base) */
+.status-badge,
+.difficulty-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
   line-height: 1.2;
   width: fit-content;
+}
+
+/* Status Badge Component */
+.status-badge {
+  gap: 6px;
+
+  &.success {
+    background-color: var(--status-success-bg);
+    color: var(--status-success);
+
+    .status-dot {
+      background-color: var(--status-success);
+      box-shadow: 0 0 8px var(--status-success);
+    }
+  }
+
+  &.pending {
+    background-color: var(--status-pending-bg);
+    color: var(--status-pending);
+
+    .status-dot {
+      background-color: var(--status-pending);
+      box-shadow: 0 0 8px var(--status-pending);
+    }
+  }
+
+  &.warning {
+    background-color: var(--status-warning-bg);
+    color: var(--status-warning);
+
+    .status-dot {
+      background-color: var(--status-warning);
+    }
+  }
 }
 
 .status-dot {
@@ -166,36 +206,6 @@ body {
   height: 8px;
   border-radius: 50%;
   background-color: var(--text-muted);
-}
-
-/* Status Variations */
-.status-badge.success {
-  background-color: var(--status-success-bg);
-  color: var(--status-success);
-}
-
-.status-badge.success .status-dot {
-  background-color: var(--status-success);
-  box-shadow: 0 0 8px var(--status-success);
-}
-
-.status-badge.pending {
-  background-color: var(--status-pending-bg);
-  color: var(--status-pending);
-}
-
-.status-badge.pending .status-dot {
-  background-color: var(--status-pending);
-  box-shadow: 0 0 8px var(--status-pending);
-}
-
-.status-badge.warning {
-  background-color: var(--status-warning-bg);
-  color: var(--status-warning);
-}
-
-.status-badge.warning .status-dot {
-  background-color: var(--status-warning);
 }
 
 /* Problem Box Component */
@@ -208,18 +218,18 @@ body {
   border-radius: 8px;
   padding: 10px;
   border: 1px solid var(--border-card-subtle);
-  transition: all 0.2s ease;
   cursor: pointer;
-}
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 
-.problem-box:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover);
-  transform: translate(-2px, -2px);
-}
+  &:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    transform: translate(-2px, -2px);
+  }
 
-.problem-box:active {
-  transform: translate(0, 0);
+  &:active {
+    transform: translate(0, 0);
+  }
 }
 
 .problem-title {
@@ -228,6 +238,7 @@ body {
   color: var(--text-main);
   line-height: 1.4;
   word-break: break-word;
+  user-select: text; /* Allow user to select & copy question title */
 }
 
 .problem-footer {
@@ -237,31 +248,22 @@ body {
   gap: 8px;
 }
 
-.difficulty-tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px; /* 膠囊型 */
-  line-height: 1.2;
-  width: fit-content;
-}
-
 /* LeetCode Difficulty Variations */
-.difficulty-tag.Easy {
-  color: var(--difficulty-easy);
-  background: var(--difficulty-easy-bg);
-}
+.difficulty-tag {
+  &.Easy {
+    color: var(--difficulty-easy);
+    background: var(--difficulty-easy-bg);
+  }
 
-.difficulty-tag.Medium {
-  color: var(--difficulty-medium);
-  background: var(--difficulty-medium-bg);
-}
+  &.Medium {
+    color: var(--difficulty-medium);
+    background: var(--difficulty-medium-bg);
+  }
 
-.difficulty-tag.Hard {
-  color: var(--difficulty-hard);
-  background: var(--difficulty-hard-bg);
+  &.Hard {
+    color: var(--difficulty-hard);
+    background: var(--difficulty-hard-bg);
+  }
 }
 
 /* Meta Info Component */
@@ -299,21 +301,14 @@ body {
   padding: 2px;
   border-radius: 4px;
   line-height: 1;
-}
 
-.refresh-btn-inline:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-main);
+  &:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-main);
+  }
 }
 
 /* Contest Section Component */
-.contest-section {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
-
 .contest-card {
   display: flex;
   align-items: center;
@@ -335,6 +330,10 @@ body {
   gap: 6px;
   text-decoration: none;
   overflow: hidden;
+
+  &:hover .contest-title {
+    color: var(--brand-accent);
+  }
 }
 
 .contest-title {
@@ -344,11 +343,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.2s;
-}
-
-.contest-link:hover .contest-title {
-  color: var(--brand-accent);
+  transition: color 0.2s ease;
 }
 
 .contest-time {
@@ -372,10 +367,10 @@ body {
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
-}
 
-.reminder-label:hover {
-  color: var(--text-main);
+  &:hover {
+    color: var(--text-main);
+  }
 }
 
 .reminder-checkbox {
@@ -388,32 +383,31 @@ body {
   background-color: transparent;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
   flex-shrink: 0;
   margin: 0;
-}
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 
-.reminder-checkbox:hover {
-  border-color: var(--text-main);
-}
+  &:hover {
+    border-color: var(--text-main);
+  }
 
-.reminder-checkbox:checked {
-  background-color: var(--brand-accent);
-  border-color: var(--brand-accent);
-}
+  &:checked {
+    background-color: var(--brand-accent);
+    border-color: var(--brand-accent);
 
-.reminder-checkbox:checked::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 0.5px;
-  width: 3.5px;
-  height: 7px;
-  border: solid var(--bg-primary);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
+    &::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 0.5px;
+      width: 3.5px;
+      height: 7px;
+      border: solid var(--bg-primary);
+      border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg);
+    }
+  }
 }
-
 
 /* Animations */
 @keyframes spin {
