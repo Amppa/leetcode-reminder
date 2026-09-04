@@ -22,12 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const weeklyCountdown = document.getElementById('weeklyCountdown');
   const weeklyReminderCheckbox = document.getElementById('weeklyReminderCheckbox');
   const weeklyReminderText = document.getElementById('weeklyReminderText');
+  const weeklyReminder3mCheckbox = document.getElementById('weeklyReminder3mCheckbox');
+  const weeklyReminder3mText = document.getElementById('weeklyReminder3mText');
 
   const biweeklyLink = document.getElementById('biweeklyLink');
   const biweeklyTitle = document.getElementById('biweeklyTitle');
   const biweeklyCountdown = document.getElementById('biweeklyCountdown');
   const biweeklyReminderCheckbox = document.getElementById('biweeklyReminderCheckbox');
   const biweeklyReminderText = document.getElementById('biweeklyReminderText');
+  const biweeklyReminder3mCheckbox = document.getElementById('biweeklyReminder3mCheckbox');
+  const biweeklyReminder3mText = document.getElementById('biweeklyReminder3mText');
 
   let currentLang = 'zh';
   let cachedData = {};
@@ -100,8 +104,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
 
     // Contests section i18n
-    if (weeklyReminderText) weeklyReminderText.textContent = t.contest_reminder_text;
-    if (biweeklyReminderText) biweeklyReminderText.textContent = t.contest_reminder_text;
+    const reminder1h = t.contest_reminder_1h || t.contest_reminder_text;
+    const reminder3m = t.contest_reminder_3m || '3min before';
+    if (weeklyReminderText) weeklyReminderText.textContent = reminder1h;
+    if (weeklyReminder3mText) weeklyReminder3mText.textContent = reminder3m;
+    if (biweeklyReminderText) biweeklyReminderText.textContent = reminder1h;
+    if (biweeklyReminder3mText) biweeklyReminder3mText.textContent = reminder3m;
   }
 
   // Render UI with cached data
@@ -116,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
       questionDifficulty: difficulty,
       questionLink,
       contests,
-      contestReminders = { weekly_1h: true, biweekly_1h: true }
+      contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true }
     } = data;
 
     const t = I18N[currentLang];
@@ -189,8 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (weeklyReminderCheckbox) {
       weeklyReminderCheckbox.checked = contestReminders.weekly_1h !== false;
     }
+    if (weeklyReminder3mCheckbox) {
+      weeklyReminder3mCheckbox.checked = contestReminders.weekly_3m !== false;
+    }
     if (biweeklyReminderCheckbox) {
       biweeklyReminderCheckbox.checked = contestReminders.biweekly_1h !== false;
+    }
+    if (biweeklyReminder3mCheckbox) {
+      biweeklyReminder3mCheckbox.checked = contestReminders.biweekly_3m !== false;
     }
 
     updateAllCountdowns();
@@ -200,7 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveContestReminderSettings() {
     const settings = {
       weekly_1h: weeklyReminderCheckbox ? weeklyReminderCheckbox.checked : true,
-      biweekly_1h: biweeklyReminderCheckbox ? biweeklyReminderCheckbox.checked : true
+      weekly_3m: weeklyReminder3mCheckbox ? weeklyReminder3mCheckbox.checked : true,
+      biweekly_1h: biweeklyReminderCheckbox ? biweeklyReminderCheckbox.checked : true,
+      biweekly_3m: biweeklyReminder3mCheckbox ? biweeklyReminder3mCheckbox.checked : true
     };
     chrome.storage.local.set({ contestReminders: settings }, () => {
       chrome.runtime.sendMessage({ action: 'update_contest_alarms' });
@@ -210,8 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (weeklyReminderCheckbox) {
     weeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
   }
+  if (weeklyReminder3mCheckbox) {
+    weeklyReminder3mCheckbox.addEventListener('change', saveContestReminderSettings);
+  }
   if (biweeklyReminderCheckbox) {
     biweeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
+  }
+  if (biweeklyReminder3mCheckbox) {
+    biweeklyReminder3mCheckbox.addEventListener('change', saveContestReminderSettings);
   }
 
   // 1. Load language preference & cached data

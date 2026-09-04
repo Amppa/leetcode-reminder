@@ -299,34 +299,45 @@ async function checkLeetCodeDaily(forceCheck = false) {
   }
 }
 
-// Sync 1-hour before alarms for Weekly & Biweekly Contests
+// Sync 1-hour and 3-minute before alarms for Weekly & Biweekly Contests
 async function syncContestAlarms(contests) {
   if (!contests) {
     const data = await chrome.storage.local.get(['contests', 'contestReminders']);
     contests = data.contests;
   }
-  const { contestReminders = { weekly_1h: true, biweekly_1h: true } } = await chrome.storage.local.get('contestReminders');
+  const { contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true } } = await chrome.storage.local.get('contestReminders');
 
   const types = ['weekly', 'biweekly'];
+  const offsets = [
+    { key: '1h', sec: 3600 },
+    { key: '3m', sec: 180 }
+  ];
+
   for (const type of types) {
-    const alarmName = `contest_alarm_${type}`;
     const contest = contests?.[type];
-    const isEnabled = contestReminders[`${type}_1h`] !== false;
+    for (const offset of offsets) {
+      const alarmName = `contest_alarm_${type}_${offset.key}`;
+      const isEnabled = contestReminders[`${type}_${offset.key}`] !== false;
 
-    if (isEnabled && contest?.startTime) {
-      // Trigger exactly 60 minutes before contest start
-      const triggerTimeMs = (contest.startTime - 3600) * 1000;
-      const nowMs = Date.now();
+      if (isEnabled && contest?.startTime) {
+        // Trigger precisely before contest start
+        const triggerTimeMs = (contest.startTime - offset.sec) * 1000;
+        const nowMs = Date.now();
 
-      if (triggerTimeMs > nowMs) {
-        chrome.alarms.create(alarmName, { when: triggerTimeMs });
+        if (triggerTimeMs > nowMs) {
+          chrome.alarms.create(alarmName, { when: triggerTimeMs });
+        } else {
+          chrome.alarms.clear(alarmName);
+        }
       } else {
         chrome.alarms.clear(alarmName);
       }
-    } else {
-      chrome.alarms.clear(alarmName);
     }
   }
+
+  // Clear legacy alarm names if any
+  chrome.alarms.clear('contest_alarm_weekly');
+  chrome.alarms.clear('contest_alarm_biweekly');
 }
 
 // Global Single Notification Click Listener (Prevents duplicate tabs!)
@@ -341,7 +352,8 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
     chrome.tabs.create({ url: targetUrl });
   } else if (notificationId.startsWith('contest_notify_')) {
     chrome.notifications.clear(notificationId);
-    const type = notificationId.replace('contest_notify_', '');
+    const match = notificationId.match(/^contest_notify_([a-zA-Z]+)/);
+    const type = match ? match[1] : 'weekly';
     const { contests } = await chrome.storage.local.get('contests');
     const contestUrl = contests?.[type]?.link || 'https://leetcode.com/contest/';
     chrome.tabs.create({ url: contestUrl });
@@ -369,21 +381,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     checkLeetCodeDaily(false);
-  } else if (alarm.name === 'contest_alarm_weekly' || alarm.name === 'contest_alarm_biweekly') {
-    const type = alarm.name.replace('contest_alarm_', '');
+  } else if (alarm.name.startsWith('contest_alarm_')) {
+    const parts = alarm.name.replace('contest_alarm_', '').split('_');
+    const type = parts[0];
+    const offsetKey = parts[1] || '1h';
+
     const { contests, lang = 'zh' } = await chrome.storage.local.get(['contests', 'lang']);
     const contest = contests?.[type];
 
     if (contest) {
       const isZh = lang === 'zh';
       const titleName = contest.title || (type === 'biweekly' ? 'Biweekly Contest' : 'Weekly Contest');
-      chrome.notifications.create(`contest_notify_${type}`, {
+      const is3m = offsetKey === '3m';
+
+      const title = isZh
+        ? (is3m ? 'LeetCode 競賽即將於 3 分鐘後開始！' : 'LeetCode 競賽即將於 1 小時後開始！')
+        : (is3m ? 'LeetCode Contest Starting in 3 Minutes!' : 'LeetCode Contest Starting in 1 Hour!');
+
+      const message = isZh
+        ? (is3m
+            ? `【${titleName}】倒數 3 分鐘開賽，請做好準備！點擊前往競賽頁面！`
+            : `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`)
+        : (is3m
+            ? `【${titleName}】starts in 3 minutes. Get ready! Click to join now!`
+            : `【${titleName}】starts in 60 minutes. Click to join now!`);
+
+      chrome.notifications.create(`contest_notify_${type}_${offsetKey}`, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
-        title: isZh ? 'LeetCode 競賽即將於 1 小時後開始！' : 'LeetCode Contest Starting in 1 Hour!',
-        message: isZh
-          ? `【${titleName}】倒數 60 分鐘開賽，點擊前往競賽頁面！`
-          : `【${titleName}】starts in 60 minutes. Click to join now!`,
+        title,
+        message,
         priority: 2
       });
     }
