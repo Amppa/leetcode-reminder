@@ -180,8 +180,17 @@ body {
 }
 
 .theme-icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
   display: block;
   transition: transform 0.3s ease;
+}
+
+.refresh-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .icon-btn {
