@@ -4,6 +4,8 @@
 const ALARM_NAME = 'leetcode_daily_alarm';
 const UTC_MIDNIGHT_ALARM_NAME = 'leetcode_utc_midnight_alarm';
 const CHECK_INTERVAL_MINUTES = 60;
+// Buffer time (seconds) after UTC 00:00:00 to avoid server rollover glitches and transient race conditions
+const UTC_MIDNIGHT_BUFFER_SECONDS = 15;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
@@ -76,14 +78,14 @@ async function updateBadge(status) {
   }
 }
 
-// Schedule precise alarm at next UTC 00:00:15 (with 15s buffer for LeetCode server rollover)
+// Schedule precise alarm at next UTC midnight + buffer
 function scheduleUtcMidnightAlarm() {
   const now = new Date();
   const nextMidnightUtc = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate() + 1,
-    0, 0, 15 // 15s buffer after UTC midnight
+    0, 0, UTC_MIDNIGHT_BUFFER_SECONDS
   );
   chrome.alarms.create(UTC_MIDNIGHT_ALARM_NAME, { when: nextMidnightUtc });
 }
