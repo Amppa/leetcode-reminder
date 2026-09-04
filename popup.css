@@ -15,7 +15,10 @@
   --text-value: #e4e4e7;
   --text-muted: #a1a1aa;
 
-  /* 2. Status tokens (Note: Chrome toolbar badge colors are configured in background.js BADGE_CONFIG) */
+  /* 2. Brand / Accent tokens */
+  --brand-accent: #ffa116;
+
+  /* 3. Status tokens (Note: Chrome toolbar badge colors are configured in background.js BADGE_CONFIG) */
   --status-success: #10b981;
   --status-success-bg: rgba(16, 185, 129, 0.15);
   --status-pending: #ef4444;
@@ -23,7 +26,7 @@
   --status-warning: #f59e0b;
   --status-warning-bg: rgba(245, 158, 11, 0.15);
 
-  /* 3. LeetCode Difficulty tokens */
+  /* 4. LeetCode Difficulty tokens */
   --difficulty-easy: #00b8a3;
   --difficulty-easy-bg: rgba(0, 184, 163, 0.12);
   --difficulty-medium: #ffc01e;
@@ -345,7 +348,7 @@ body {
 }
 
 .contest-link:hover .contest-title {
-  color: #ffa116;
+  color: var(--brand-accent);
 }
 
 .contest-time {
@@ -376,11 +379,41 @@ body {
 }
 
 .reminder-checkbox {
-  accent-color: #ffa116;
-  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
   width: 13px;
   height: 13px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 3px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin: 0;
 }
+
+.reminder-checkbox:hover {
+  border-color: var(--text-main);
+}
+
+.reminder-checkbox:checked {
+  background-color: var(--brand-accent);
+  border-color: var(--brand-accent);
+}
+
+.reminder-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.5px;
+  width: 3.5px;
+  height: 7px;
+  border: solid var(--bg-primary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
 
 /* Animations */
 @keyframes spin {
