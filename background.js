@@ -16,8 +16,8 @@ let isChecking = false;
 const BADGE_CONFIG = {
   TEXT: ' !',
   TEXT_COLOR: '#FFFFFF',
-  NOT_LOGGED_IN: '#F59E0B', // Amber (--status-warning)
-  UNFINISHED: '#EF4444',    // Red (--status-pending)
+  BG_NOT_LOGGED_IN: '#F59E0B', // Amber (--status-warning)
+  BG_UNFINISHED: '#EF4444',    // Red (--status-pending)
 };
 
 // Get current date string in UTC (YYYY-MM-DD)
@@ -65,13 +65,12 @@ async function updateBadge(status) {
     } else if (status === 'not_logged_in') {
       await chrome.action.setBadgeText({ text: BADGE_CONFIG.TEXT });
       await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.NOT_LOGGED_IN });
-
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.BG_NOT_LOGGED_IN });
     } else {
       // Unfinished daily question (NotStart)
       await chrome.action.setBadgeText({ text: BADGE_CONFIG.TEXT });
       await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.UNFINISHED });
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.BG_UNFINISHED });
     }
   } catch (err) {
     console.error('[LeetCode Reminder] Failed to update badge:', err);
@@ -100,7 +99,30 @@ function setupAlarm() {
   scheduleUtcMidnightAlarm();
 }
 
-// Fetch upcoming contests (Public API, zero login required)
+// Parse Weekly and Biweekly contests from GraphQL topTwoContests array
+function parseContests(topContests = []) {
+  let weeklyContest = null;
+  let biweeklyContest = null;
+
+  for (const c of topContests) {
+    const slug = (c.titleSlug || '').toLowerCase();
+    const info = {
+      title: c.title,
+      titleSlug: c.titleSlug,
+      startTime: c.startTime, // Unix timestamp (seconds)
+      duration: c.duration,
+      link: `https://leetcode.com/contest/${c.titleSlug}/`
+    };
+    if (slug.includes('biweekly')) {
+      biweeklyContest = info;
+    } else if (slug.includes('weekly')) {
+      weeklyContest = info;
+    }
+  }
+  return { weekly: weeklyContest, biweekly: biweeklyContest };
+}
+
+// Fetch upcoming contests (Used only when not logged in to get contest schedules)
 async function fetchUpcomingContests() {
   const query = JSON.stringify({
     query: `query topTwoContests {
@@ -128,27 +150,7 @@ async function fetchUpcomingContests() {
 
     if (res.ok) {
       const json = await res.json();
-      const topContests = json?.data?.topTwoContests || [];
-      let weeklyContest = null;
-      let biweeklyContest = null;
-
-      for (const c of topContests) {
-        const slug = (c.titleSlug || '').toLowerCase();
-        const info = {
-          title: c.title,
-          titleSlug: c.titleSlug,
-          startTime: c.startTime, // Unix timestamp (seconds)
-          duration: c.duration,
-          link: `https://leetcode.com/contest/${c.titleSlug}/`
-        };
-        if (slug.includes('biweekly')) {
-          biweeklyContest = info;
-        } else if (slug.includes('weekly')) {
-          weeklyContest = info;
-        }
-      }
-
-      const contests = { weekly: weeklyContest, biweekly: biweeklyContest };
+      const contests = parseContests(json?.data?.topTwoContests);
       await chrome.storage.local.set({ contests });
       await syncContestAlarms(contests);
       return contests;
@@ -176,50 +178,48 @@ async function checkLeetCodeDaily(forceCheck = false) {
       }
     }
 
-    // 2. Refresh upcoming contests
-    await fetchUpcomingContests();
+    // 2. Cookie Check: Check LEETCODE_SESSION & csrftoken
+    let sessionCookie = null;
+    let csrfCookie = null;
+    try {
+      const cookies = await chrome.cookies.getAll({
+        domain: 'leetcode.com'
+      });
+      if (cookies && cookies.length > 0) {
+        for (const c of cookies) {
+          if (c.name === 'LEETCODE_SESSION') sessionCookie = c.value;
+          if (c.name === 'csrftoken') csrfCookie = c.value;
+        }
+      }
+    } catch (e) {
+      console.error('[LeetCode Reminder] Cookie error:', e);
+    }
 
-    // 3. Language preference
     const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
 
-  // 3. Cookie Check: Check LEETCODE_SESSION & csrftoken
-  let sessionCookie = null;
-  let csrfCookie = null;
-  try {
-    const cookies = await chrome.cookies.getAll({
-      domain: 'leetcode.com'
-    });
-    if (cookies && cookies.length > 0) {
-      for (const c of cookies) {
-        if (c.name === 'LEETCODE_SESSION') sessionCookie = c.value;
-        if (c.name === 'csrftoken') csrfCookie = c.value;
-      }
+    // If not logged in, fetch contest schedule separately and notify user
+    if (!sessionCookie) {
+      await fetchUpcomingContests();
+      await chrome.storage.local.set({
+        isLoggedIn: false,
+        lastStatus: 'not_logged_in',
+        lastCheckTime: getFormattedTime(),
+        todayUtc
+      });
+      await updateBadge('not_logged_in');
+
+      // Notify user to log in (i18n)
+      chrome.notifications.create(NOTIFICATION_ID, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: userLang === 'en' ? 'LeetCode Reminder: Not Logged In' : 'LeetCode 提醒：未登入',
+        message: userLang === 'en'
+          ? 'Not logged in to LeetCode. Click to log in and track your daily challenge!'
+          : '尚未偵測到 LeetCode 登入狀態，請點擊登入以追蹤每日挑戰解題進度。',
+        priority: 1
+      });
+      return;
     }
-  } catch (e) {
-    console.error('[LeetCode Reminder] Cookie error:', e);
-  }
-
-  if (!sessionCookie) {
-    await chrome.storage.local.set({
-      isLoggedIn: false,
-      lastStatus: 'not_logged_in',
-      lastCheckTime: getFormattedTime(),
-      todayUtc
-    });
-    await updateBadge('not_logged_in');
-
-    // Notify user to log in (i18n)
-    chrome.notifications.create(NOTIFICATION_ID, {
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: userLang === 'en' ? 'LeetCode Reminder: Not Logged In' : 'LeetCode 提醒：未登入',
-      message: userLang === 'en'
-        ? 'Not logged in to LeetCode. Click to log in and track your daily challenge!'
-        : '尚未偵測到 LeetCode 登入狀態，請點擊登入以追蹤每日挑戰解題進度。',
-      priority: 1
-    });
-    return;
-  }
 
   // 3. Background GraphQL Request
   try {
@@ -258,26 +258,8 @@ async function checkLeetCodeDaily(forceCheck = false) {
     const link = dailyData.link || '';
     const fullLink = link.startsWith('http') ? link : `https://leetcode.com${link}`;
 
-    // Parse Weekly & Biweekly Contests
-    const topContests = json?.data?.topTwoContests || [];
-    let weeklyContest = null;
-    let biweeklyContest = null;
-
-    for (const c of topContests) {
-      const slug = (c.titleSlug || '').toLowerCase();
-      const info = {
-        title: c.title,
-        titleSlug: c.titleSlug,
-        startTime: c.startTime, // Unix timestamp (seconds)
-        duration: c.duration,
-        link: `https://leetcode.com/contest/${c.titleSlug}/`
-      };
-      if (slug.includes('biweekly')) {
-        biweeklyContest = info;
-      } else if (slug.includes('weekly')) {
-        weeklyContest = info;
-      }
-    }
+    // Parse Weekly & Biweekly Contests from unified response
+    const contests = parseContests(json?.data?.topTwoContests);
 
     const updatePayload = {
       isLoggedIn: true,
@@ -288,10 +270,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
       questionTitle: question?.title || '',
       questionDifficulty: question?.difficulty || '',
       questionLink: fullLink,
-      contests: {
-        weekly: weeklyContest,
-        biweekly: biweeklyContest
-      }
+      contests
     };
 
     if (userStatus === 'Finish') {

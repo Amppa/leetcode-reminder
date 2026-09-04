@@ -16,22 +16,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetCountdown = document.getElementById('resetCountdown');
   const problemBox = document.getElementById('problemBox');
 
-  // Contest DOM elements
-  const weeklyLink = document.getElementById('weeklyLink');
-  const weeklyTitle = document.getElementById('weeklyTitle');
-  const weeklyCountdown = document.getElementById('weeklyCountdown');
-  const weeklyReminderCheckbox = document.getElementById('weeklyReminderCheckbox');
-  const weeklyReminderText = document.getElementById('weeklyReminderText');
-  const weeklyReminder3mCheckbox = document.getElementById('weeklyReminder3mCheckbox');
-  const weeklyReminder3mText = document.getElementById('weeklyReminder3mText');
-
-  const biweeklyLink = document.getElementById('biweeklyLink');
-  const biweeklyTitle = document.getElementById('biweeklyTitle');
-  const biweeklyCountdown = document.getElementById('biweeklyCountdown');
-  const biweeklyReminderCheckbox = document.getElementById('biweeklyReminderCheckbox');
-  const biweeklyReminderText = document.getElementById('biweeklyReminderText');
-  const biweeklyReminder3mCheckbox = document.getElementById('biweeklyReminder3mCheckbox');
-  const biweeklyReminder3mText = document.getElementById('biweeklyReminder3mText');
+  // Contest UI DOM mapping
+  const contestUI = {
+    weekly: {
+      link: document.getElementById('weeklyLink'),
+      title: document.getElementById('weeklyTitle'),
+      countdown: document.getElementById('weeklyCountdown'),
+      reminders: {
+        '1h': { input: document.getElementById('weeklyReminderCheckbox'), text: document.getElementById('weeklyReminderText') },
+        '3m': { input: document.getElementById('weeklyReminder3mCheckbox'), text: document.getElementById('weeklyReminder3mText') }
+      }
+    },
+    biweekly: {
+      link: document.getElementById('biweeklyLink'),
+      title: document.getElementById('biweeklyTitle'),
+      countdown: document.getElementById('biweeklyCountdown'),
+      reminders: {
+        '1h': { input: document.getElementById('biweeklyReminderCheckbox'), text: document.getElementById('biweeklyReminderText') },
+        '3m': { input: document.getElementById('biweeklyReminder3mCheckbox'), text: document.getElementById('biweeklyReminder3mText') }
+      }
+    }
+  };
 
   let currentLang = 'zh';
   let cachedData = {};
@@ -80,14 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Update contest countdowns
-    const weekly = cachedData?.contests?.weekly;
-    const biweekly = cachedData?.contests?.biweekly;
-
-    if (weeklyCountdown) {
-      weeklyCountdown.textContent = formatContestCountdown(weekly?.startTime, weekly?.duration);
-    }
-    if (biweeklyCountdown) {
-      biweeklyCountdown.textContent = formatContestCountdown(biweekly?.startTime, biweekly?.duration);
+    for (const type of ['weekly', 'biweekly']) {
+      const contest = cachedData?.contests?.[type];
+      const el = contestUI[type].countdown;
+      if (el) el.textContent = formatContestCountdown(contest?.startTime, contest?.duration);
     }
   }
 
@@ -104,12 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
 
     // Contests section i18n
-    const reminder1h = t.contest_reminder_1h || t.contest_reminder_text;
-    const reminder3m = t.contest_reminder_3m || '3min before';
-    if (weeklyReminderText) weeklyReminderText.textContent = reminder1h;
-    if (weeklyReminder3mText) weeklyReminder3mText.textContent = reminder3m;
-    if (biweeklyReminderText) biweeklyReminderText.textContent = reminder1h;
-    if (biweeklyReminder3mText) biweeklyReminder3mText.textContent = reminder3m;
+    for (const type of ['weekly', 'biweekly']) {
+      contestUI[type].reminders['1h'].text.textContent = t.contest_reminder_1h;
+      contestUI[type].reminders['3m'].text.textContent = t.contest_reminder_3m;
+    }
   }
 
   // Render UI with cached data
@@ -175,36 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
       lastCheckTime.textContent = checkTime || '--';
     }
 
-    // Render Weekly Contest
-    const weekly = contests?.weekly;
-    if (weekly) {
-      if (weeklyTitle) weeklyTitle.textContent = weekly.title || t.weekly_title_default;
-      if (weeklyLink) weeklyLink.href = weekly.link || 'https://leetcode.com/contest/';
-    } else {
-      if (weeklyTitle) weeklyTitle.textContent = t.weekly_title_default;
-    }
+    // Render Weekly & Biweekly Contests
+    for (const type of ['weekly', 'biweekly']) {
+      const contest = contests?.[type];
+      const ui = contestUI[type];
+      const defaultTitle = t[`${type}_title_default`];
+      if (ui.title) ui.title.textContent = contest?.title || defaultTitle;
+      if (ui.link) ui.link.href = contest?.link || 'https://leetcode.com/contest/';
 
-    // Render Biweekly Contest
-    const biweekly = contests?.biweekly;
-    if (biweekly) {
-      if (biweeklyTitle) biweeklyTitle.textContent = biweekly.title || t.biweekly_title_default;
-      if (biweeklyLink) biweeklyLink.href = biweekly.link || 'https://leetcode.com/contest/';
-    } else {
-      if (biweeklyTitle) biweeklyTitle.textContent = t.biweekly_title_default;
-    }
-
-    // Checkbox states
-    if (weeklyReminderCheckbox) {
-      weeklyReminderCheckbox.checked = contestReminders.weekly_1h !== false;
-    }
-    if (weeklyReminder3mCheckbox) {
-      weeklyReminder3mCheckbox.checked = contestReminders.weekly_3m !== false;
-    }
-    if (biweeklyReminderCheckbox) {
-      biweeklyReminderCheckbox.checked = contestReminders.biweekly_1h !== false;
-    }
-    if (biweeklyReminder3mCheckbox) {
-      biweeklyReminder3mCheckbox.checked = contestReminders.biweekly_3m !== false;
+      for (const offset of ['1h', '3m']) {
+        const checkbox = ui.reminders[offset].input;
+        if (checkbox) {
+          checkbox.checked = contestReminders[`${type}_${offset}`] !== false;
+        }
+      }
     }
 
     updateAllCountdowns();
@@ -212,28 +195,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Save checkbox setting and trigger alarm sync
   function saveContestReminderSettings() {
-    const settings = {
-      weekly_1h: weeklyReminderCheckbox ? weeklyReminderCheckbox.checked : true,
-      weekly_3m: weeklyReminder3mCheckbox ? weeklyReminder3mCheckbox.checked : true,
-      biweekly_1h: biweeklyReminderCheckbox ? biweeklyReminderCheckbox.checked : true,
-      biweekly_3m: biweeklyReminder3mCheckbox ? biweeklyReminder3mCheckbox.checked : true
-    };
+    const settings = {};
+    for (const type of ['weekly', 'biweekly']) {
+      for (const offset of ['1h', '3m']) {
+        const checkbox = contestUI[type].reminders[offset].input;
+        settings[`${type}_${offset}`] = checkbox ? checkbox.checked : true;
+      }
+    }
     chrome.storage.local.set({ contestReminders: settings }, () => {
       chrome.runtime.sendMessage({ action: 'update_contest_alarms' });
     });
   }
 
-  if (weeklyReminderCheckbox) {
-    weeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
+  // Bind change listeners to all reminder checkboxes
+  for (const type of ['weekly', 'biweekly']) {
+    for (const offset of ['1h', '3m']) {
+      const checkbox = contestUI[type].reminders[offset].input;
+      if (checkbox) checkbox.addEventListener('change', saveContestReminderSettings);
+    }
   }
-  if (weeklyReminder3mCheckbox) {
-    weeklyReminder3mCheckbox.addEventListener('change', saveContestReminderSettings);
-  }
-  if (biweeklyReminderCheckbox) {
-    biweeklyReminderCheckbox.addEventListener('change', saveContestReminderSettings);
-  }
-  if (biweeklyReminder3mCheckbox) {
-    biweeklyReminder3mCheckbox.addEventListener('change', saveContestReminderSettings);
+
+  // Helper: Check if daily challenge is completed for current UTC day
+  function isChallengeFinishedToday(data) {
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
   }
 
   // 1. Load language preference & cached data
@@ -243,12 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderData(items || {});
 
-    // Cache hit check: If finished today (UTC), do not query LeetCode
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const isFinishedToday = items?.lastStatus === 'Finish' && items?.lastCompletedUtcDate === todayUtc;
-
-    // Auto-check on popup open if unfinished, unauthenticated, or cache missing
-    if (!isFinishedToday) {
+    // Auto-check on popup open if not finished today (SWR pattern)
+    if (!isChallengeFinishedToday(items)) {
       if (refreshBtn) refreshBtn.classList.add('spinning');
       chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
         if (refreshBtn) refreshBtn.classList.remove('spinning');
