@@ -19,9 +19,9 @@ This document serves as an architectural overview and developer guide for AI age
 ```
 leetcode-reminder/
 ├── manifest.json         # Extension Manifest V3 configuration
-├── background.js        # Background Service Worker (Alarms, GraphQL API, Notifications, Badge)
+├── background.js        # Background Service Worker (Modular helpers, Storage Enum, GraphQL API, Alarms)
 ├── popup.html           # Popup UI layout structure
-├── popup.js             # Popup interaction logic, theme, i18n, & countdowns
+├── popup.js             # Declarative Popup UI renderer (STATUS_MAP), theme, i18n, & countdowns
 ├── popup.css            # Extension styling with CSS Custom Properties (Dark/Light themes)
 ├── i18n.js              # Localization dictionary (zh / en)
 ├── _locales/            # Standard Chrome locales (Extension name & description)
@@ -35,11 +35,11 @@ leetcode-reminder/
 ## 3. Core Architecture & Component Responsibilities
 
 ### 3.1 Background Service Worker (`background.js`)
-- **Non-persistent execution**: Runs only when triggered by Chrome alarms, popup messages, or startup/install events.
-- **Cookie Auth Check**: Reads `LEETCODE_SESSION` & `csrftoken` cookies from domain `leetcode.com` via `chrome.cookies.getAll`.
-- **GraphQL Integration**:
-  - Sends POST request to `https://leetcode.com/graphql`.
-  - Executes consolidated `dailyAndContests` query fetching `activeDailyCodingChallengeQuestion` and `topTwoContests` in a single HTTP request.
+- **Storage Centralization**: Uses `STORAGE_KEYS` enum for type-safe key references across `chrome.storage.local`.
+- **Modularized Functions**:
+  - `getLeetCodeCookies()`: Reads `LEETCODE_SESSION` & `csrftoken` cookies from domain `leetcode.com`.
+  - `fetchGraphQL()`: Generic helper executing POST requests to `https://leetcode.com/graphql`.
+  - `showUnfinishedNotification()`: Generates localized desktop notifications for unfinished challenges.
 - **Badge Management**:
   - `Finish`: Clears badge (`""`).
   - `NotStart`: Sets red `!` badge (`#EF4444`).
@@ -55,6 +55,10 @@ leetcode-reminder/
   - `chrome.notifications.onClicked`: Single tab focus handler preventing duplicate tabs.
 
 ### 3.2 Popup Interface (`popup.html`, `popup.js`, `popup.css`)
+- **Declarative UI Rendering (`STATUS_MAP`)**:
+  - Maps status states (`not_logged_in`, `Finish`, `error`, `pending`) declaratively to badge classes, status texts, difficulty tags, and target URLs.
+- **Debounced Refresh**:
+  - Prevents rapid double-clicking on manual refresh button via `isRefreshing` guard.
 - **SWR (Stale-While-Revalidate) Rendering**:
   - Immediately loads cached state from `chrome.storage.local` upon opening popup.
   - Triggers asynchronous `check_status_now` message to `background.js` if today's daily problem is not marked `Finish`.
@@ -64,10 +68,6 @@ leetcode-reminder/
 - **Live Countdowns**:
   - Daily UTC reset countdown (`resetCountdown`) calculating time remaining until UTC 00:00.
   - Contest countdowns (`weeklyCountdown`, `biweeklyCountdown`) displaying formatted `Starts in Xd Xh` / `Starts in Xh Xm`.
-- **User Preference Controls**:
-  - Language toggle (`EN` / `中`).
-  - Theme toggle (Sun / Moon icon).
-  - Individual contest reminder checkboxes (1h and 3m toggles for Weekly and Biweekly contests).
 
 ### 3.3 Internationalization (`i18n.js` & `_locales/`)
 - `_locales/`: Provides localized Chrome Store extension name (`appName`) and description (`appDesc`).
@@ -75,23 +75,24 @@ leetcode-reminder/
 
 ---
 
-## 4. Chrome Storage Schema (`chrome.storage.local`)
+## 4. Chrome Storage Schema (`chrome.storage.local` & `STORAGE_KEYS`)
 
-| Key | Type | Description |
-|---|---|---|
-| `isLoggedIn` | `boolean` | Indicates if `LEETCODE_SESSION` cookie is present |
-| `lastStatus` | `string` | Status code: `'Finish'`, `'NotStart'`, `'not_logged_in'`, or `'error'` |
-| `lastCheckTime` | `string` | Formatted local time string of last status check |
-| `todayUtc` | `string` | Current UTC date string (`YYYY-MM-DD`) |
-| `lastCompletedUtcDate` | `string` | UTC date string when daily challenge was completed |
-| `questionId` | `string` | Frontend question ID (e.g., `"1"`) |
-| `questionTitle` | `string` | Problem title (e.g., `"Two Sum"`) |
-| `questionDifficulty` | `string` | Difficulty level (`"Easy"`, `"Medium"`, `"Hard"`) |
-| `questionLink` | `string` | Direct URL link to problem page |
-| `contests` | `object` | Map containing `weekly` and `biweekly` contest info (`title`, `startTime`, `duration`, `link`) |
-| `contestReminders` | `object` | Map of booleans: `{ weekly_1h, weekly_3m, biweekly_1h, biweekly_3m }` |
-| `lang` | `string` | Preferred UI language (`'zh'` or `'en'`) |
-| `theme` | `string` | Preferred theme (`'dark'` or `'light'`) |
+| Key Constant (`STORAGE_KEYS`) | String Key | Type | Description |
+|---|---|---|---|
+| `IS_LOGGED_IN` | `isLoggedIn` | `boolean` | Indicates if `LEETCODE_SESSION` cookie is present |
+| `LAST_STATUS` | `lastStatus` | `string` | Status code: `'Finish'`, `'NotStart'`, `'not_logged_in'`, or `'error'` |
+| `LAST_CHECK_TIME` | `lastCheckTime` | `string` | Formatted local time string of last status check |
+| `TODAY_UTC` | `todayUtc` | `string` | Current UTC date string (`YYYY-MM-DD`) |
+| `LAST_COMPLETED_UTC_DATE` | `lastCompletedUtcDate` | `string` | UTC date string when daily challenge was completed |
+| `QUESTION_ID` | `questionId` | `string` | Frontend question ID (e.g., `"1"`) |
+| `QUESTION_TITLE` | `questionTitle` | `string` | Problem title (e.g., `"Two Sum"`) |
+| `QUESTION_DIFFICULTY` | `questionDifficulty` | `string` | Difficulty level (`"Easy"`, `"Medium"`, `"Hard"`) |
+| `QUESTION_LINK` | `questionLink` | `string` | Direct URL link to problem page |
+| `CONTESTS` | `contests` | `object` | Map containing `weekly` and `biweekly` contest info |
+| `CONTEST_REMINDERS` | `contestReminders` | `object` | Map of booleans: `{ weekly_1h, weekly_3m, biweekly_1h, biweekly_3m }` |
+| `LANG` | `lang` | `string` | Preferred UI language (`'zh'` or `'en'`) |
+| `THEME` | `theme` | `string` | Preferred theme (`'dark'` or `'light'`) |
+| `TRACKED_TABS` | `trackedLeetCodeTabs` | `array` | Active tab IDs currently viewing LeetCode problem pages |
 
 ---
 

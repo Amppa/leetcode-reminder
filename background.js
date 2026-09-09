@@ -4,28 +4,43 @@
 const ALARM_NAME = 'leetcode_daily_alarm';
 const DAILY_RESET_ALARM_NAME = 'leetcode_daily_reset_alarm';
 const CHECK_INTERVAL_MINUTES = 60;
-// Random jitter range (seconds) after daily reset to avoid server thundering herd & rate limits
 const DAILY_RESET_DELAY_MIN_SEC = 60;
 const DAILY_RESET_DELAY_MAX_SEC = 180;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
-// In-flight guard to prevent duplicate concurrent GraphQL checks
-let isChecking = false;
+// Storage keys enumeration for clean, bug-free storage management
+const STORAGE_KEYS = {
+  IS_LOGGED_IN: 'isLoggedIn',
+  LAST_STATUS: 'lastStatus',
+  LAST_CHECK_TIME: 'lastCheckTime',
+  TODAY_UTC: 'todayUtc',
+  LAST_COMPLETED_UTC_DATE: 'lastCompletedUtcDate',
+  QUESTION_ID: 'questionId',
+  QUESTION_TITLE: 'questionTitle',
+  QUESTION_DIFFICULTY: 'questionDifficulty',
+  QUESTION_LINK: 'questionLink',
+  CONTESTS: 'contests',
+  CONTEST_REMINDERS: 'contestReminders',
+  LANG: 'lang',
+  THEME: 'theme',
+  TRACKED_TABS: 'trackedLeetCodeTabs'
+};
 
-// Badge display tokens (matches --status-* in popup.css)
+// Badge display tokens
 const BADGE_CONFIG = {
   TEXT: ' !',
   TEXT_COLOR: '#FFFFFF',
-  BG_NOT_LOGGED_IN: '#F59E0B', // Amber (--status-warning)
-  BG_UNFINISHED: '#EF4444',    // Red (--status-pending)
+  BG_NOT_LOGGED_IN: '#F59E0B', // Amber
+  BG_UNFINISHED: '#EF4444'     // Red
 };
 
+// In-flight guard to prevent duplicate concurrent GraphQL checks
+let isChecking = false;
+
 // Get current date string in UTC (YYYY-MM-DD)
-// LeetCode resets daily coding challenge strictly at UTC 00:00
 function getUtcTodayString() {
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
 // Get user-friendly local time string
@@ -33,7 +48,7 @@ function getFormattedTime() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Combined GraphQL payload: questionOfToday + topTwoContests (0 overhead, single HTTP request)
+// Combined GraphQL payload: questionOfToday + topTwoContests
 const GRAPHQL_QUERY = JSON.stringify({
   query: `query dailyAndContests {
     activeDailyCodingChallengeQuestion {
@@ -68,7 +83,6 @@ async function updateBadge(status) {
       await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
       await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.BG_NOT_LOGGED_IN });
     } else {
-      // Unfinished daily question (NotStart)
       await chrome.action.setBadgeText({ text: BADGE_CONFIG.TEXT });
       await chrome.action.setBadgeTextColor({ color: BADGE_CONFIG.TEXT_COLOR });
       await chrome.action.setBadgeBackgroundColor({ color: BADGE_CONFIG.BG_UNFINISHED });
@@ -78,7 +92,52 @@ async function updateBadge(status) {
   }
 }
 
-// Schedule alarm at next daily reset + random delay (60s to 180s)
+// Fetch authentication cookies from leetcode.com
+async function getLeetCodeCookies() {
+  let sessionCookie = null;
+  let csrfCookie = null;
+  try {
+    const cookies = await chrome.cookies.getAll({ domain: 'leetcode.com' });
+    if (cookies && cookies.length > 0) {
+      for (const c of cookies) {
+        if (c.name === 'LEETCODE_SESSION') sessionCookie = c.value;
+        if (c.name === 'csrftoken') csrfCookie = c.value;
+      }
+    }
+  } catch (e) {
+    console.error('[LeetCode Reminder] Cookie error:', e);
+  }
+  return { sessionCookie, csrfCookie };
+}
+
+// Execute GraphQL POST request
+async function fetchGraphQL(queryPayload, sessionCookie = null, csrfCookie = null) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Referer': 'https://leetcode.com/',
+    'Origin': 'https://leetcode.com'
+  };
+  if (sessionCookie) {
+    headers['Cookie'] = `LEETCODE_SESSION=${sessionCookie}${csrfCookie ? `; csrftoken=${csrfCookie}` : ''}`;
+  }
+  if (csrfCookie) {
+    headers['x-csrftoken'] = csrfCookie;
+  }
+
+  const response = await fetch(LEETCODE_GRAPHQL_URL, {
+    method: 'POST',
+    headers,
+    body: queryPayload
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`HTTP ${response.status}: ${errText}`);
+  }
+  return await response.json();
+}
+
+// Alarm Helpers
 function scheduleDailyResetAlarm() {
   const now = new Date();
   const randomDelaySec = DAILY_RESET_DELAY_MIN_SEC +
@@ -92,7 +151,6 @@ function scheduleDailyResetAlarm() {
   chrome.alarms.create(DAILY_RESET_ALARM_NAME, { when: nextResetUtc });
 }
 
-// Ensure hourly alarm is running (when daily problem is unfinished)
 function ensureHourlyAlarm() {
   chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
     if (!existingAlarm) {
@@ -101,31 +159,26 @@ function ensureHourlyAlarm() {
   });
 }
 
-// Stop hourly alarm (when daily problem is completed for today)
 function stopHourlyAlarm() {
   chrome.alarms.clear(ALARM_NAME);
 }
 
-// Re-align hourly alarm starting 60 minutes after daily reset
 function realignHourlyAlarm() {
   chrome.alarms.clear(ALARM_NAME, () => {
     chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
   });
 }
 
-// Ensure hourly alarm and daily reset alarm are set
 async function setupAlarm() {
   const todayUtc = getUtcTodayString();
-  const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
+  const cached = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
 
-  // Dynamic Alarm: Pause hourly alarm if already solved today (0 wakeups & 0 CPU/RAM)
-  if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
+  if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc) {
     stopHourlyAlarm();
   } else {
     ensureHourlyAlarm();
   }
 
-  // Clear legacy alarm name for clean backward compatibility
   chrome.alarms.clear('leetcode_utc_midnight_alarm');
   scheduleDailyResetAlarm();
 }
@@ -140,7 +193,7 @@ function parseContests(topContests = []) {
     const info = {
       title: c.title,
       titleSlug: c.titleSlug,
-      startTime: c.startTime, // Unix timestamp (seconds)
+      startTime: c.startTime,
       duration: c.duration,
       link: `https://leetcode.com/contest/${c.titleSlug}/`
     };
@@ -153,43 +206,43 @@ function parseContests(topContests = []) {
   return { weekly: weeklyContest, biweekly: biweeklyContest };
 }
 
-// Fetch upcoming contests (Used only when not logged in to get contest schedules)
+// Fetch upcoming contests when not logged in
 async function fetchUpcomingContests() {
   const query = JSON.stringify({
     query: `query topTwoContests {
-      topTwoContests {
-        title
-        titleSlug
-        startTime
-        duration
-      }
+      topTwoContests { title titleSlug startTime duration }
     }`,
     variables: {},
     operationName: "topTwoContests"
   });
 
   try {
-    const res = await fetch(LEETCODE_GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Referer': 'https://leetcode.com/contest/',
-        'Origin': 'https://leetcode.com'
-      },
-      body: query
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const contests = parseContests(json?.data?.topTwoContests);
-      await chrome.storage.local.set({ contests });
-      await syncContestAlarms(contests);
-      return contests;
-    }
+    const json = await fetchGraphQL(query);
+    const contests = parseContests(json?.data?.topTwoContests);
+    await chrome.storage.local.set({ [STORAGE_KEYS.CONTESTS]: contests });
+    await syncContestAlarms(contests);
+    return contests;
   } catch (err) {
     console.warn('[LeetCode Reminder] Fetch contests failed:', err);
   }
   return null;
+}
+
+// Show desktop notification for unfinished daily challenge
+function showUnfinishedNotification(userLang, question) {
+  const qPrefix = question?.frontendQuestionId ? `${question.frontendQuestionId}. ` : '';
+  const qTitle = question?.title || (userLang === 'en' ? 'Today\'s Challenge' : '今日題目');
+  const qDiff = question?.difficulty ? ` [${question.difficulty}]` : '';
+
+  chrome.notifications.create(NOTIFICATION_ID, {
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: userLang === 'en' ? 'LeetCode Daily Challenge Unfinished!' : 'LeetCode 每日一題尚未完成！',
+    message: userLang === 'en'
+      ? `${qPrefix}${qTitle}${qDiff}\nClick to solve it now!`
+      : `${qPrefix}${qTitle}${qDiff}\n點擊立即前往解題！`,
+    priority: 2
+  });
 }
 
 // Check LeetCode Daily Challenge status
@@ -200,47 +253,30 @@ async function checkLeetCodeDaily(forceCheck = false) {
   try {
     const todayUtc = getUtcTodayString();
 
-    // 1. Storage-First Check: If already finished today (UTC) and not forced, complete cache hit
+    // 1. Storage-First Check
     if (!forceCheck) {
-      const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
-      if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
+      const cached = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
+      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc) {
         stopHourlyAlarm();
         await updateBadge('Finish');
         return;
       }
     }
 
-    // 2. Cookie Check: Check LEETCODE_SESSION & csrftoken
-    let sessionCookie = null;
-    let csrfCookie = null;
-    try {
-      const cookies = await chrome.cookies.getAll({
-        domain: 'leetcode.com'
-      });
-      if (cookies && cookies.length > 0) {
-        for (const c of cookies) {
-          if (c.name === 'LEETCODE_SESSION') sessionCookie = c.value;
-          if (c.name === 'csrftoken') csrfCookie = c.value;
-        }
-      }
-    } catch (e) {
-      console.error('[LeetCode Reminder] Cookie error:', e);
-    }
+    // 2. Cookie Check
+    const { sessionCookie, csrfCookie } = await getLeetCodeCookies();
+    const { [STORAGE_KEYS.LANG]: userLang = 'zh' } = await chrome.storage.local.get(STORAGE_KEYS.LANG);
 
-    const { lang: userLang = 'zh' } = await chrome.storage.local.get('lang');
-
-    // If not logged in, fetch contest schedule separately and notify user
     if (!sessionCookie) {
       await fetchUpcomingContests();
       await chrome.storage.local.set({
-        isLoggedIn: false,
-        lastStatus: 'not_logged_in',
-        lastCheckTime: getFormattedTime(),
-        todayUtc
+        [STORAGE_KEYS.IS_LOGGED_IN]: false,
+        [STORAGE_KEYS.LAST_STATUS]: 'not_logged_in',
+        [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime(),
+        [STORAGE_KEYS.TODAY_UTC]: todayUtc
       });
       await updateBadge('not_logged_in');
 
-      // Notify user to log in (i18n)
       chrome.notifications.create(NOTIFICATION_ID, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
@@ -254,30 +290,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
     }
 
     // 3. Background GraphQL Request
-    const headers = {
-      'Content-Type': 'application/json',
-      'Referer': 'https://leetcode.com/',
-      'Origin': 'https://leetcode.com',
-      'Cookie': `LEETCODE_SESSION=${sessionCookie}${csrfCookie ? `; csrftoken=${csrfCookie}` : ''}`
-    };
-
-    if (csrfCookie) {
-      headers['x-csrftoken'] = csrfCookie;
-    }
-
-    const response = await fetch(LEETCODE_GRAPHQL_URL, {
-      method: 'POST',
-      headers,
-      body: GRAPHQL_QUERY
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('[LeetCode Reminder] HTTP Error body:', errText);
-      throw new Error(`HTTP ${response.status}: ${errText}`);
-    }
-
-    const json = await response.json();
+    const json = await fetchGraphQL(GRAPHQL_QUERY, sessionCookie, csrfCookie);
     const dailyData = json?.data?.activeDailyCodingChallengeQuestion;
 
     if (!dailyData) {
@@ -288,63 +301,43 @@ async function checkLeetCodeDaily(forceCheck = false) {
     const question = dailyData.question;
     const link = dailyData.link || '';
     const fullLink = link.startsWith('http') ? link : `https://leetcode.com${link}`;
-
-    // Parse Weekly & Biweekly Contests from unified response
     const contests = parseContests(json?.data?.topTwoContests);
 
     const updatePayload = {
-      isLoggedIn: true,
-      lastStatus: userStatus,
-      lastCheckTime: getFormattedTime(),
-      todayUtc,
-      questionId: question?.frontendQuestionId || '',
-      questionTitle: question?.title || '',
-      questionDifficulty: question?.difficulty || '',
-      questionLink: fullLink,
-      contests
+      [STORAGE_KEYS.IS_LOGGED_IN]: true,
+      [STORAGE_KEYS.LAST_STATUS]: userStatus,
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime(),
+      [STORAGE_KEYS.TODAY_UTC]: todayUtc,
+      [STORAGE_KEYS.QUESTION_ID]: question?.frontendQuestionId || '',
+      [STORAGE_KEYS.QUESTION_TITLE]: question?.title || '',
+      [STORAGE_KEYS.QUESTION_DIFFICULTY]: question?.difficulty || '',
+      [STORAGE_KEYS.QUESTION_LINK]: fullLink,
+      [STORAGE_KEYS.CONTESTS]: contests
     };
 
     if (userStatus === 'Finish') {
-      updatePayload.lastCompletedUtcDate = todayUtc;
+      updatePayload[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] = todayUtc;
       await chrome.storage.local.set(updatePayload);
       await updateBadge('Finish');
       stopHourlyAlarm();
-
-      // Clear any remaining notification since problem is solved
       chrome.notifications.clear(NOTIFICATION_ID);
     } else {
       await chrome.storage.local.set(updatePayload);
       await updateBadge('NotStart');
       ensureHourlyAlarm();
-
-      // Show hourly reminder notification (i18n)
-      const qPrefix = question?.frontendQuestionId ? `${question.frontendQuestionId}. ` : '';
-      const qTitle = question?.title || (userLang === 'en' ? 'Today\'s Challenge' : '今日題目');
-      const qDiff = question?.difficulty ? ` [${question.difficulty}]` : '';
-
-      chrome.notifications.create(NOTIFICATION_ID, {
-        type: 'basic',
-        iconUrl: 'icons/icon128.png',
-        title: userLang === 'en' ? 'LeetCode Daily Challenge Unfinished!' : 'LeetCode 每日一題尚未完成！',
-        message: userLang === 'en'
-          ? `${qPrefix}${qTitle}${qDiff}\nClick to solve it now!`
-          : `${qPrefix}${qTitle}${qDiff}\n點擊立即前往解題！`,
-        priority: 2
-      });
+      showUnfinishedNotification(userLang, question);
     }
 
-    // Schedule 1-hour before alarms for contests if enabled
-    await syncContestAlarms(updatePayload.contests);
+    await syncContestAlarms(updatePayload[STORAGE_KEYS.CONTESTS]);
   } catch (err) {
     console.error('[LeetCode Reminder] GraphQL fetch failed:', err);
     await chrome.storage.local.set({
-      lastStatus: 'error',
-      lastCheckTime: getFormattedTime()
+      [STORAGE_KEYS.LAST_STATUS]: 'error',
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime()
     });
-    // Soft error: maintain reminder badge if today is unfinished
-    const prev = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
+    const prev = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
     const todayUtc = getUtcTodayString();
-    if (prev?.lastStatus !== 'Finish' || prev?.lastCompletedUtcDate !== todayUtc) {
+    if (prev?.[STORAGE_KEYS.LAST_STATUS] !== 'Finish' || prev?.[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] !== todayUtc) {
       await updateBadge('NotStart');
     }
   } finally {
@@ -355,10 +348,10 @@ async function checkLeetCodeDaily(forceCheck = false) {
 // Sync 1-hour and 3-minute before alarms for Weekly & Biweekly Contests
 async function syncContestAlarms(contests) {
   if (!contests) {
-    const data = await chrome.storage.local.get(['contests', 'contestReminders']);
-    contests = data.contests;
+    const data = await chrome.storage.local.get([STORAGE_KEYS.CONTESTS, STORAGE_KEYS.CONTEST_REMINDERS]);
+    contests = data[STORAGE_KEYS.CONTESTS];
   }
-  const { contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true } } = await chrome.storage.local.get('contestReminders');
+  const { [STORAGE_KEYS.CONTEST_REMINDERS]: contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true } } = await chrome.storage.local.get(STORAGE_KEYS.CONTEST_REMINDERS);
 
   const types = ['weekly', 'biweekly'];
   const offsets = [
@@ -373,11 +366,8 @@ async function syncContestAlarms(contests) {
       const isEnabled = contestReminders[`${type}_${offset.key}`] !== false;
 
       if (isEnabled && contest?.startTime) {
-        // Trigger precisely before contest start
         const triggerTimeMs = (contest.startTime - offset.sec) * 1000;
-        const nowMs = Date.now();
-
-        if (triggerTimeMs > nowMs) {
+        if (triggerTimeMs > Date.now()) {
           chrome.alarms.create(alarmName, { when: triggerTimeMs });
         } else {
           chrome.alarms.clear(alarmName);
@@ -388,26 +378,25 @@ async function syncContestAlarms(contests) {
     }
   }
 
-  // Clear legacy alarm names if any
   chrome.alarms.clear('contest_alarm_weekly');
   chrome.alarms.clear('contest_alarm_biweekly');
 }
 
-// Global Single Notification Click Listener (Prevents duplicate tabs!)
+// Notification Click Listener
 chrome.notifications.onClicked.addListener(async (notificationId) => {
   if (notificationId === NOTIFICATION_ID) {
     chrome.notifications.clear(NOTIFICATION_ID);
-    const data = await chrome.storage.local.get(['isLoggedIn', 'questionLink']);
-    const targetUrl = (!data.isLoggedIn || !data.questionLink)
+    const data = await chrome.storage.local.get([STORAGE_KEYS.IS_LOGGED_IN, STORAGE_KEYS.QUESTION_LINK]);
+    const targetUrl = (!data[STORAGE_KEYS.IS_LOGGED_IN] || !data[STORAGE_KEYS.QUESTION_LINK])
       ? 'https://leetcode.com/problemset/all/'
-      : data.questionLink;
+      : data[STORAGE_KEYS.QUESTION_LINK];
 
     chrome.tabs.create({ url: targetUrl });
   } else if (notificationId.startsWith('contest_notify_')) {
     chrome.notifications.clear(notificationId);
     const match = notificationId.match(/^contest_notify_([a-zA-Z]+)/);
     const type = match ? match[1] : 'weekly';
-    const { contests } = await chrome.storage.local.get('contests');
+    const { [STORAGE_KEYS.CONTESTS]: contests } = await chrome.storage.local.get(STORAGE_KEYS.CONTESTS);
     const contestUrl = contests?.[type]?.link || 'https://leetcode.com/contest/';
     chrome.tabs.create({ url: contestUrl });
   }
@@ -421,7 +410,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, data });
       });
     });
-    return true; // Keep channel open for async response
+    return true;
   } else if (request.action === 'update_contest_alarms') {
     syncContestAlarms().then(() => {
       sendResponse({ success: true });
@@ -432,7 +421,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Send contest reminder notification
 async function sendContestNotification(type, offsetKey = '1h') {
-  const { lang = 'zh' } = await chrome.storage.local.get('lang');
+  const { [STORAGE_KEYS.LANG]: lang = 'zh' } = await chrome.storage.local.get(STORAGE_KEYS.LANG);
   const is3m = offsetKey === '3m';
   const time = lang === 'zh' ? (is3m ? '3 分鐘' : '1 小時') : (is3m ? '3 minutes' : '1 hour');
 
@@ -445,7 +434,7 @@ async function sendContestNotification(type, offsetKey = '1h') {
   });
 }
 
-// Alarm Listener (every 60 mins check + midnight rollover + precise contest alarms)
+// Alarm Listener
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     checkLeetCodeDaily(false);
@@ -478,10 +467,10 @@ const getStorageSession = () => chrome.storage.session || chrome.storage.local;
 async function trackLeetCodeTab(tabId) {
   try {
     const storage = getStorageSession();
-    const { trackedLeetCodeTabs = [] } = await storage.get('trackedLeetCodeTabs');
+    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
     if (!trackedLeetCodeTabs.includes(tabId)) {
       trackedLeetCodeTabs.push(tabId);
-      await storage.set({ trackedLeetCodeTabs });
+      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
     }
   } catch (e) {
     console.error('[LeetCode Reminder] Track tab error:', e);
@@ -491,12 +480,11 @@ async function trackLeetCodeTab(tabId) {
 async function checkAndUntrackLeetCodeTab(tabId) {
   try {
     const storage = getStorageSession();
-    const { trackedLeetCodeTabs = [] } = await storage.get('trackedLeetCodeTabs');
+    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
     const index = trackedLeetCodeTabs.indexOf(tabId);
     if (index !== -1) {
       trackedLeetCodeTabs.splice(index, 1);
-      await storage.set({ trackedLeetCodeTabs });
-      // Trigger instant status check when user closes or navigates away from LeetCode problem tab
+      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
       checkLeetCodeDaily(true);
     }
   } catch (e) {
@@ -517,4 +505,3 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   checkAndUntrackLeetCodeTab(tabId);
 });
-

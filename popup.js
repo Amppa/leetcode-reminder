@@ -1,5 +1,5 @@
-// Pure Vanilla JS (<4KB) for LeetCode Reminder Popup
-// Zero external dependencies, instant render
+// Pure Vanilla JS for LeetCode Reminder Popup
+// Zero external dependencies, declarative status rendering
 
 document.addEventListener('DOMContentLoaded', () => {
   const subtitle = document.getElementById('subtitle');
@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeIcon = document.getElementById('themeIcon');
   const refreshBtn = document.getElementById('refreshBtn');
   const statusBadge = document.getElementById('statusBadge');
-  const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
   const difficultyTag = document.getElementById('difficultyTag');
   const problemTitle = document.getElementById('problemTitle');
@@ -18,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetCountdown = document.getElementById('resetCountdown');
   const problemBox = document.getElementById('problemBox');
 
-  // Contest UI DOM mapping
   const contestUI = {
     weekly: {
       link: document.getElementById('weeklyLink'),
@@ -43,6 +41,43 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentLang = 'zh';
   let currentTheme = 'dark';
   let cachedData = {};
+  let isRefreshing = false;
+
+  // Declarative UI state lookup table
+  const STATUS_MAP = {
+    not_logged_in: {
+      badgeClass: 'warning',
+      statusKey: 'status_not_logged_in',
+      tagKey: 'tag_auth',
+      useCustomTagClass: false,
+      titleKey: 'title_not_logged_in',
+      url: 'https://leetcode.com/accounts/login/'
+    },
+    Finish: {
+      badgeClass: 'success',
+      statusKey: 'status_finish',
+      tagKey: 'tag_solved',
+      useCustomTagClass: true,
+      titleKey: null,
+      url: null
+    },
+    error: {
+      badgeClass: 'warning',
+      statusKey: 'status_error',
+      tagKey: 'tag_error',
+      useCustomTagClass: true,
+      titleKey: 'title_error',
+      url: null
+    },
+    pending: {
+      badgeClass: 'pending',
+      statusKey: 'status_pending',
+      tagKey: 'tag_todo',
+      useCustomTagClass: true,
+      titleKey: null,
+      url: null
+    }
+  };
 
   // Format countdown string for contests
   function formatContestCountdown(startTimeSec, durationSec = 5400) {
@@ -53,10 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const diffSec = startTimeSec - nowSec;
 
     if (diffSec <= 0) {
-      if (diffSec + durationSec > 0) {
-        return t.contest_started;
-      }
-      return t.contest_ended;
+      return diffSec + durationSec > 0 ? t.contest_started : t.contest_ended;
     }
 
     const days = Math.floor(diffSec / 86400);
@@ -69,10 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update countdowns (Daily UTC reset + Contests)
   function updateAllCountdowns() {
     const now = new Date();
-    const utcHours = now.getUTCHours();
-    const utcMinutes = now.getUTCMinutes();
-    const utcSeconds = now.getUTCSeconds();
-    const elapsedSeconds = utcHours * 3600 + utcMinutes * 60 + utcSeconds;
+    const elapsedSeconds = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
     const remainingSeconds = 86400 - elapsedSeconds;
 
     const remHours = Math.floor(remainingSeconds / 3600);
@@ -87,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
       resetCountdown.textContent = `${localHour}:${localMin} (${t.time_remaining(remHours, remMinutes)})`;
     }
 
-    // Update contest countdowns
     for (const type of ['weekly', 'biweekly']) {
       const contest = cachedData?.contests?.[type];
       const el = contestUI[type].countdown;
@@ -95,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Apply language strings to static & dynamic UI elements
+  // Apply language strings
   function applyLanguage() {
     const t = I18N[currentLang];
     if (langBtn) {
@@ -107,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (labelLastCheck) labelLastCheck.textContent = t.label_last_check;
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
 
-    // Contests section i18n
     for (const type of ['weekly', 'biweekly']) {
       contestUI[type].reminders['1h'].text.textContent = t.contest_reminder_1h;
       contestUI[type].reminders['3m'].text.textContent = t.contest_reminder_3m;
@@ -127,17 +154,15 @@ document.addEventListener('DOMContentLoaded', () => {
     updateThemeUI();
   }
 
-  // Update theme toggle button icon and tooltip
+  // Update theme button icon
   function updateThemeUI() {
     const t = I18N[currentLang];
     if (themeBtn && themeIcon) {
       if (currentTheme === 'light') {
-        // Light theme active -> show Moon icon to switch to dark
         themeIcon.innerHTML = '<path d="M12.3 2a10 10 0 0 0-.19 2 10 10 0 0 0 10 10c.68 0 1.35-.07 2-.19A10 10 0 1 1 12.3 2z"/>';
         themeBtn.title = t.theme_to_dark;
         themeBtn.setAttribute('aria-label', t.theme_to_dark);
       } else {
-        // Dark theme active -> show Sun icon to switch to light
         themeIcon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0-1.41-1.41l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0-1.41-1.41l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>';
         themeBtn.title = t.theme_to_light;
         themeBtn.setAttribute('aria-label', t.theme_to_light);
@@ -145,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Render UI with cached data
+  // Declarative Data Rendering
   function renderData(data = {}) {
     cachedData = data;
     const {
@@ -163,57 +188,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const t = I18N[currentLang];
     applyLanguage();
 
-    statusBadge.className = 'status-badge';
+    const formattedTitle = questionId && title ? `${questionId}. ${title}` : (title || t.title_default);
 
-    const formattedTitle = questionId && title
-      ? `${questionId}. ${title}`
-      : (title || t.title_default);
+    // Determine status state
+    let stateKey = 'pending';
+    if (isLoggedIn === false || lastStatus === 'not_logged_in') stateKey = 'not_logged_in';
+    else if (lastStatus === 'Finish') stateKey = 'Finish';
+    else if (lastStatus === 'error') stateKey = 'error';
 
-    if (isLoggedIn === false || lastStatus === 'not_logged_in') {
-      const loginUrl = 'https://leetcode.com/accounts/login/';
-      statusBadge.classList.add('warning');
-      statusText.textContent = t.status_not_logged_in;
-      difficultyTag.textContent = t.tag_auth;
-      difficultyTag.className = 'difficulty-tag';
-      problemTitle.textContent = t.title_not_logged_in;
-      if (problemBox) problemBox.href = loginUrl;
-    } else if (lastStatus === 'Finish') {
-      const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
-      statusBadge.classList.add('success');
-      statusText.textContent = t.status_finish;
-      difficultyTag.textContent = difficulty || t.tag_solved;
-      difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
-      problemTitle.textContent = formattedTitle;
-      if (problemBox) problemBox.href = targetUrl;
-    } else if (lastStatus === 'error') {
-      const allUrl = 'https://leetcode.com/problemset/all/';
-      statusBadge.classList.add('warning');
-      statusText.textContent = t.status_error;
-      difficultyTag.textContent = difficulty || t.tag_error;
-      difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
-      problemTitle.textContent = title ? formattedTitle : t.title_error;
-      if (problemBox) problemBox.href = questionLink || allUrl;
-    } else {
-      // Unfinished
-      const targetUrl = questionLink || 'https://leetcode.com/problemset/all/';
-      statusBadge.classList.add('pending');
-      statusText.textContent = t.status_pending;
-      difficultyTag.textContent = difficulty || t.tag_todo;
-      difficultyTag.className = `difficulty-tag ${difficulty || ''}`;
-      problemTitle.textContent = formattedTitle;
-      if (problemBox) problemBox.href = targetUrl;
+    const state = STATUS_MAP[stateKey];
+
+    // Apply UI attributes declaratively
+    statusBadge.className = `status-badge ${state.badgeClass}`;
+    statusText.textContent = t[state.statusKey];
+    difficultyTag.textContent = state.useCustomTagClass && difficulty ? difficulty : t[state.tagKey];
+    difficultyTag.className = state.useCustomTagClass ? `difficulty-tag ${difficulty || ''}` : 'difficulty-tag';
+    problemTitle.textContent = state.titleKey ? t[state.titleKey] : formattedTitle;
+
+    if (problemBox) {
+      problemBox.href = state.url || questionLink || 'https://leetcode.com/problemset/all/';
     }
 
     if (lastCheckTime) {
       lastCheckTime.textContent = checkTime || '--';
     }
 
-    // Render Weekly & Biweekly Contests
+    // Render Contests
     for (const type of ['weekly', 'biweekly']) {
       const contest = contests?.[type];
       const ui = contestUI[type];
-      const defaultTitle = t[`${type}_title_default`];
-      if (ui.title) ui.title.textContent = contest?.title || defaultTitle;
+      if (ui.title) ui.title.textContent = contest?.title || t[`${type}_title_default`];
       if (ui.link) ui.link.href = contest?.link || 'https://leetcode.com/contest/';
 
       for (const offset of ['1h', '3m']) {
@@ -227,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllCountdowns();
   }
 
-  // Save checkbox setting and trigger alarm sync
+  // Save checkbox setting
   function saveContestReminderSettings() {
     const settings = {};
     for (const type of ['weekly', 'biweekly']) {
@@ -241,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Bind change listeners to all reminder checkboxes
+  // Bind change listeners to reminder checkboxes
   for (const type of ['weekly', 'biweekly']) {
     for (const offset of ['1h', '3m']) {
       const checkbox = contestUI[type].reminders[offset].input;
@@ -249,13 +253,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Helper: Check if daily challenge is completed for current UTC day
   function isChallengeFinishedToday(data) {
     const todayUtc = new Date().toISOString().slice(0, 10);
     return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
   }
 
-  // 1. Load language & theme preferences, and cached data
+  // Trigger status refresh with debounce guard
+  function triggerRefresh() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+
+    chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
+      isRefreshing = false;
+      if (refreshBtn) refreshBtn.classList.remove('spinning');
+      if (response && response.data) {
+        renderData(response.data);
+      }
+    });
+  }
+
+  // 1. Initial Load & Render
   chrome.storage.local.get(null, (items) => {
     if (items && items.lang) {
       currentLang = items.lang;
@@ -263,19 +281,12 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(items?.theme || 'dark');
     renderData(items || {});
 
-    // Auto-check on popup open if not finished today (SWR pattern)
     if (!isChallengeFinishedToday(items)) {
-      if (refreshBtn) refreshBtn.classList.add('spinning');
-      chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
-        if (refreshBtn) refreshBtn.classList.remove('spinning');
-        if (response && response.data) {
-          renderData(response.data);
-        }
-      });
+      triggerRefresh();
     }
   });
 
-  // 2. Language switch click
+  // Event Listeners
   if (langBtn) {
     langBtn.addEventListener('click', () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
@@ -284,7 +295,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 3. Theme switch click
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
       const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -293,19 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 3. Manual Refresh trigger
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      refreshBtn.classList.add('spinning');
-      chrome.runtime.sendMessage({ action: 'check_status_now' }, (response) => {
-        refreshBtn.classList.remove('spinning');
-        if (response && response.data) {
-          renderData(response.data);
-        }
-      });
-    });
+    refreshBtn.addEventListener('click', triggerRefresh);
   }
 
-  // Update countdown every minute if popup is open
   setInterval(updateAllCountdowns, 60000);
 });

@@ -23,7 +23,7 @@ const I18N = {
     tag_todo: 'Todo',
     tag_auth: 'Auth',
     tag_error: 'Error',
-    time_remaining: (h, m) => `剩 ${h}小時${m}分`,
+    time_remaining: (h = 0, m = 0) => `剩 ${h}小時${m}分`,
     weekly_title_default: 'Weekly Contest',
     biweekly_title_default: 'Biweekly Contest',
     contest_reminder_1h: '1 小時前提醒',
@@ -31,7 +31,7 @@ const I18N = {
     contest_calc: '計算中...',
     contest_started: '比賽進行中',
     contest_ended: '已結束，等待更新',
-    contest_countdown: (days, hours, mins) => {
+    contest_countdown: (days = 0, hours = 0, mins = 0) => {
       if (days > 0) return `距開始：${days}天 ${hours}小時`;
       if (hours > 0) return `距開始：${hours}小時 ${mins}分`;
       return `距開始：${mins}分鐘`;
@@ -58,7 +58,7 @@ const I18N = {
     tag_todo: 'Todo',
     tag_auth: 'Auth',
     tag_error: 'Error',
-    time_remaining: (h, m) => `${h}h ${m}m left`,
+    time_remaining: (h = 0, m = 0) => `${h}h ${m}m left`,
     weekly_title_default: 'Weekly Contest',
     biweekly_title_default: 'Biweekly Contest',
     contest_reminder_1h: '1hr before',
@@ -66,7 +66,7 @@ const I18N = {
     contest_calc: 'Calculating...',
     contest_started: 'In progress',
     contest_ended: 'Ended, waiting for update',
-    contest_countdown: (days, hours, mins) => {
+    contest_countdown: (days = 0, hours = 0, mins = 0) => {
       if (days > 0) return `Starts in ${days}d ${hours}h`;
       if (hours > 0) return `Starts in ${hours}h ${mins}m`;
       return `Starts in ${mins}m`;
