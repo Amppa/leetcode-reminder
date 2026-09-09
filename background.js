@@ -1,12 +1,12 @@
 // Background Service Worker for LeetCode Daily Reminder
 // Ultra-low CPU & RAM: zero persistent timers, non-persistent service worker
 
-const ALARM_NAME = 'leetcode_daily_alarm';
+const HOURLY_ALARM_NAME = 'leetcode_daily_alarm';
 const DAILY_RESET_ALARM_NAME = 'leetcode_daily_reset_alarm';
 const CHECK_INTERVAL_MINUTES = 60;
 const DAILY_RESET_DELAY_MIN_SEC = 60;
 const DAILY_RESET_DELAY_MAX_SEC = 180;
-const NOTIFICATION_ID = 'leetcode_daily_reminder';
+const DAILY_NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
 // Storage keys enumeration for clean, bug-free storage management
@@ -44,7 +44,7 @@ function getUtcTodayString() {
 }
 
 // Get user-friendly local time string
-function getFormattedTime() {
+function getFormattedLocalTime() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -152,20 +152,20 @@ function scheduleDailyResetAlarm() {
 }
 
 function ensureHourlyAlarm() {
-  chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
+  chrome.alarms.get(HOURLY_ALARM_NAME, (existingAlarm) => {
     if (!existingAlarm) {
-      chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
+      chrome.alarms.create(HOURLY_ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
     }
   });
 }
 
 function stopHourlyAlarm() {
-  chrome.alarms.clear(ALARM_NAME);
+  chrome.alarms.clear(HOURLY_ALARM_NAME);
 }
 
 function realignHourlyAlarm() {
-  chrome.alarms.clear(ALARM_NAME, () => {
-    chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
+  chrome.alarms.clear(HOURLY_ALARM_NAME, () => {
+    chrome.alarms.create(HOURLY_ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
   });
 }
 
@@ -234,7 +234,7 @@ function showUnfinishedNotification(userLang, question) {
   const qTitle = question?.title || (userLang === 'en' ? 'Today\'s Challenge' : '今日題目');
   const qDiff = question?.difficulty ? ` [${question.difficulty}]` : '';
 
-  chrome.notifications.create(NOTIFICATION_ID, {
+  chrome.notifications.create(DAILY_NOTIFICATION_ID, {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
     title: userLang === 'en' ? 'LeetCode Daily Challenge Unfinished!' : 'LeetCode 每日一題尚未完成！',
@@ -272,12 +272,12 @@ async function checkLeetCodeDaily(forceCheck = false) {
       await chrome.storage.local.set({
         [STORAGE_KEYS.IS_LOGGED_IN]: false,
         [STORAGE_KEYS.LAST_STATUS]: 'not_logged_in',
-        [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime(),
+        [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
         [STORAGE_KEYS.TODAY_UTC]: todayUtc
       });
       await updateBadge('not_logged_in');
 
-      chrome.notifications.create(NOTIFICATION_ID, {
+      chrome.notifications.create(DAILY_NOTIFICATION_ID, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
         title: userLang === 'en' ? 'LeetCode Reminder: Not Logged In' : 'LeetCode 提醒：未登入',
@@ -306,7 +306,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
     const updatePayload = {
       [STORAGE_KEYS.IS_LOGGED_IN]: true,
       [STORAGE_KEYS.LAST_STATUS]: userStatus,
-      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime(),
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
       [STORAGE_KEYS.TODAY_UTC]: todayUtc,
       [STORAGE_KEYS.QUESTION_ID]: question?.frontendQuestionId || '',
       [STORAGE_KEYS.QUESTION_TITLE]: question?.title || '',
@@ -320,7 +320,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
       await chrome.storage.local.set(updatePayload);
       await updateBadge('Finish');
       stopHourlyAlarm();
-      chrome.notifications.clear(NOTIFICATION_ID);
+      chrome.notifications.clear(DAILY_NOTIFICATION_ID);
     } else {
       await chrome.storage.local.set(updatePayload);
       await updateBadge('NotStart');
@@ -333,7 +333,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
     console.error('[LeetCode Reminder] GraphQL fetch failed:', err);
     await chrome.storage.local.set({
       [STORAGE_KEYS.LAST_STATUS]: 'error',
-      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedTime()
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime()
     });
     const prev = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
     const todayUtc = getUtcTodayString();
@@ -363,7 +363,7 @@ async function syncContestAlarms(contests) {
     const contest = contests?.[type];
     for (const offset of offsets) {
       const alarmName = `contest_alarm_${type}_${offset.key}`;
-      const isEnabled = contestReminders[`${type}_${offset.key}`] !== false;
+      const isEnabled = contestReminders[`${type}_${offset}`] !== false;
 
       if (isEnabled && contest?.startTime) {
         const triggerTimeMs = (contest.startTime - offset.sec) * 1000;
@@ -384,8 +384,8 @@ async function syncContestAlarms(contests) {
 
 // Notification Click Listener
 chrome.notifications.onClicked.addListener(async (notificationId) => {
-  if (notificationId === NOTIFICATION_ID) {
-    chrome.notifications.clear(NOTIFICATION_ID);
+  if (notificationId === DAILY_NOTIFICATION_ID) {
+    chrome.notifications.clear(DAILY_NOTIFICATION_ID);
     const data = await chrome.storage.local.get([STORAGE_KEYS.IS_LOGGED_IN, STORAGE_KEYS.QUESTION_LINK]);
     const targetUrl = (!data[STORAGE_KEYS.IS_LOGGED_IN] || !data[STORAGE_KEYS.QUESTION_LINK])
       ? 'https://leetcode.com/problemset/all/'
@@ -436,7 +436,7 @@ async function sendContestNotification(type, offsetKey = '1h') {
 
 // Alarm Listener
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === ALARM_NAME) {
+  if (alarm.name === HOURLY_ALARM_NAME) {
     checkLeetCodeDaily(false);
   } else if (alarm.name === DAILY_RESET_ALARM_NAME || alarm.name === 'leetcode_utc_midnight_alarm') {
     scheduleDailyResetAlarm();

@@ -3,11 +3,11 @@
 
 const I18N = {
   zh: {
-    langBtn: 'EN',
-    langBtnTitle: '切換為英文 / Switch to English',
+    lang_btn: 'EN',
+    lang_btn_title: '切換為英文 / Switch to English',
     theme_to_light: '切換至淺色模式',
     theme_to_dark: '切換至深色模式',
-    refreshTitle: '立即重新檢查',
+    refresh_title: '立即重新檢查',
     subtitle: '每日挑戰 & 周賽提醒',
     status_finish: '今日已解題完成！',
     status_pending: '今日尚未完成',
@@ -38,11 +38,11 @@ const I18N = {
     }
   },
   en: {
-    langBtn: '中',
-    langBtnTitle: 'Switch to Chinese / 切換為中文',
+    lang_btn: '中',
+    lang_btn_title: 'Switch to Chinese / 切換為中文',
     theme_to_light: 'Switch to light mode',
     theme_to_dark: 'Switch to dark mode',
-    refreshTitle: 'Check status now',
+    refresh_title: 'Check status now',
     subtitle: 'Daily & Contest Reminder',
     status_finish: 'Completed today!',
     status_pending: 'Not completed yet',

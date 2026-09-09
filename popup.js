@@ -123,14 +123,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Apply language strings
-  function applyLanguage() {
+  // Apply language strings to UI elements
+  function applyLanguageUI() {
     const t = I18N[currentLang];
     if (langBtn) {
-      langBtn.textContent = t.langBtn;
-      langBtn.title = t.langBtnTitle;
+      langBtn.textContent = t.lang_btn;
+      langBtn.title = t.lang_btn_title;
     }
-    if (refreshBtn) refreshBtn.title = t.refreshTitle;
+    if (refreshBtn) refreshBtn.title = t.refresh_title;
     if (subtitle) subtitle.textContent = t.subtitle;
     if (labelLastCheck) labelLastCheck.textContent = t.label_last_check;
     if (labelResetCountdown) labelResetCountdown.textContent = t.label_reset_countdown;
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } = data;
 
     const t = I18N[currentLang];
-    applyLanguage();
+    applyLanguageUI();
 
     const formattedTitle = questionId && title ? `${questionId}. ${title}` : (title || t.title_default);
 
@@ -253,13 +253,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function isChallengeFinishedToday(data) {
+  function isDailyChallengeFinishedToday(data) {
     const todayUtc = new Date().toISOString().slice(0, 10);
     return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
   }
 
   // Trigger status refresh with debounce guard
-  function triggerRefresh() {
+  function triggerStatusRefresh() {
     if (isRefreshing) return;
     isRefreshing = true;
     if (refreshBtn) refreshBtn.classList.add('spinning');
@@ -281,8 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(items?.theme || 'dark');
     renderData(items || {});
 
-    if (!isChallengeFinishedToday(items)) {
-      triggerRefresh();
+    if (!isDailyChallengeFinishedToday(items)) {
+      triggerStatusRefresh();
     }
   });
 
@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', triggerRefresh);
+    refreshBtn.addEventListener('click', triggerStatusRefresh);
   }
 
   setInterval(updateAllCountdowns, 60000);
