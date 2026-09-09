@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
       title: document.getElementById('weeklyTitle'),
       countdown: document.getElementById('weeklyCountdown'),
       reminders: {
-        '1h': { input: document.getElementById('weeklyReminderCheckbox'), text: document.getElementById('weeklyReminderText') },
+        '1h': { input: document.getElementById('weeklyReminder1hCheckbox'), text: document.getElementById('weeklyReminder1hText') },
         '3m': { input: document.getElementById('weeklyReminder3mCheckbox'), text: document.getElementById('weeklyReminder3mText') }
       }
     },
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
       title: document.getElementById('biweeklyTitle'),
       countdown: document.getElementById('biweeklyCountdown'),
       reminders: {
-        '1h': { input: document.getElementById('biweeklyReminderCheckbox'), text: document.getElementById('biweeklyReminderText') },
+        '1h': { input: document.getElementById('biweeklyReminder1hCheckbox'), text: document.getElementById('biweeklyReminder1hText') },
         '3m': { input: document.getElementById('biweeklyReminder3mCheckbox'), text: document.getElementById('biweeklyReminder3mText') }
       }
     }
