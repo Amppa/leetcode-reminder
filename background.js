@@ -92,13 +92,39 @@ function scheduleDailyResetAlarm() {
   chrome.alarms.create(DAILY_RESET_ALARM_NAME, { when: nextResetUtc });
 }
 
-// Ensure hourly alarm and daily reset alarm are set
-function setupAlarm() {
+// Ensure hourly alarm is running (when daily problem is unfinished)
+function ensureHourlyAlarm() {
   chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
     if (!existingAlarm) {
       chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
     }
   });
+}
+
+// Stop hourly alarm (when daily problem is completed for today)
+function stopHourlyAlarm() {
+  chrome.alarms.clear(ALARM_NAME);
+}
+
+// Re-align hourly alarm starting 60 minutes after daily reset
+function realignHourlyAlarm() {
+  chrome.alarms.clear(ALARM_NAME, () => {
+    chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
+  });
+}
+
+// Ensure hourly alarm and daily reset alarm are set
+async function setupAlarm() {
+  const todayUtc = getUtcTodayString();
+  const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
+
+  // Dynamic Alarm: Pause hourly alarm if already solved today (0 wakeups & 0 CPU/RAM)
+  if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
+    stopHourlyAlarm();
+  } else {
+    ensureHourlyAlarm();
+  }
+
   // Clear legacy alarm name for clean backward compatibility
   chrome.alarms.clear('leetcode_utc_midnight_alarm');
   scheduleDailyResetAlarm();
@@ -178,6 +204,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
     if (!forceCheck) {
       const cached = await chrome.storage.local.get(['lastStatus', 'lastCompletedUtcDate']);
       if (cached.lastStatus === 'Finish' && cached.lastCompletedUtcDate === todayUtc) {
+        stopHourlyAlarm();
         await updateBadge('Finish');
         return;
       }
@@ -281,12 +308,14 @@ async function checkLeetCodeDaily(forceCheck = false) {
       updatePayload.lastCompletedUtcDate = todayUtc;
       await chrome.storage.local.set(updatePayload);
       await updateBadge('Finish');
+      stopHourlyAlarm();
 
       // Clear any remaining notification since problem is solved
       chrome.notifications.clear(NOTIFICATION_ID);
     } else {
       await chrome.storage.local.set(updatePayload);
       await updateBadge('NotStart');
+      ensureHourlyAlarm();
 
       // Show hourly reminder notification (i18n)
       const qPrefix = question?.frontendQuestionId ? `${question.frontendQuestionId}. ` : '';
@@ -422,7 +451,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     checkLeetCodeDaily(false);
   } else if (alarm.name === DAILY_RESET_ALARM_NAME || alarm.name === 'leetcode_utc_midnight_alarm') {
     scheduleDailyResetAlarm();
-    checkLeetCodeDaily(false);
+    realignHourlyAlarm();
+    checkLeetCodeDaily(true);
   } else if (alarm.name.startsWith('contest_alarm_')) {
     const parts = alarm.name.replace('contest_alarm_', '').split('_');
     const type = parts[0];
