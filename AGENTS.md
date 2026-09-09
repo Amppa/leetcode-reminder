@@ -46,7 +46,7 @@ leetcode-reminder/
   - `not_logged_in`: Sets amber `!` badge (`#F59E0B`).
 - **Alarms**:
   - `leetcode_daily_alarm`: Periodic check every 60 minutes.
-  - `leetcode_utc_midnight_alarm`: Scheduled precisely at UTC 00:00:15 (UTC midnight + 15s buffer to avoid server race conditions).
+  - `leetcode_daily_reset_alarm`: Scheduled at UTC midnight with random delay jitter (60s ~ 180s buffer) to prevent API thundering herd and bypass server rollover lag.
   - `contest_alarm_[weekly|biweekly]_[1h|3m]`: Scheduled 1 hour and 3 minutes before contest start times.
 - **Tab Closure Monitoring**:
   - `chrome.tabs.onUpdated` & `chrome.tabs.onRemoved`: Tracks open LeetCode problem tabs (`leetcode.com/problems/`) and automatically triggers an instant status check (`checkLeetCodeDaily(true)`) when the user closes or navigates away from a problem tab.

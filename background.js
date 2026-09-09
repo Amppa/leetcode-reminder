@@ -2,10 +2,11 @@
 // Ultra-low CPU & RAM: zero persistent timers, non-persistent service worker
 
 const ALARM_NAME = 'leetcode_daily_alarm';
-const UTC_MIDNIGHT_ALARM_NAME = 'leetcode_utc_midnight_alarm';
+const DAILY_RESET_ALARM_NAME = 'leetcode_daily_reset_alarm';
 const CHECK_INTERVAL_MINUTES = 60;
-// Buffer time (seconds) after UTC 00:00:00 to avoid server rollover glitches and transient race conditions
-const UTC_MIDNIGHT_BUFFER_SECONDS = 15;
+// Random jitter range (seconds) after daily reset to avoid server thundering herd & rate limits
+const DAILY_RESET_DELAY_MIN_SEC = 60;
+const DAILY_RESET_DELAY_MAX_SEC = 180;
 const NOTIFICATION_ID = 'leetcode_daily_reminder';
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
 
@@ -77,26 +78,30 @@ async function updateBadge(status) {
   }
 }
 
-// Schedule precise alarm at next UTC midnight + buffer
-function scheduleUtcMidnightAlarm() {
+// Schedule alarm at next daily reset + random delay (60s to 180s)
+function scheduleDailyResetAlarm() {
   const now = new Date();
-  const nextMidnightUtc = Date.UTC(
+  const randomDelaySec = DAILY_RESET_DELAY_MIN_SEC +
+    Math.floor(Math.random() * (DAILY_RESET_DELAY_MAX_SEC - DAILY_RESET_DELAY_MIN_SEC + 1));
+  const nextResetUtc = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate() + 1,
-    0, 0, UTC_MIDNIGHT_BUFFER_SECONDS
+    0, 0, randomDelaySec
   );
-  chrome.alarms.create(UTC_MIDNIGHT_ALARM_NAME, { when: nextMidnightUtc });
+  chrome.alarms.create(DAILY_RESET_ALARM_NAME, { when: nextResetUtc });
 }
 
-// Ensure hourly alarm and midnight rollover alarm are set
+// Ensure hourly alarm and daily reset alarm are set
 function setupAlarm() {
   chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
     if (!existingAlarm) {
       chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
     }
   });
-  scheduleUtcMidnightAlarm();
+  // Clear legacy alarm name for clean backward compatibility
+  chrome.alarms.clear('leetcode_utc_midnight_alarm');
+  scheduleDailyResetAlarm();
 }
 
 // Parse Weekly and Biweekly contests from GraphQL topTwoContests array
@@ -415,8 +420,8 @@ async function sendContestNotification(type, offsetKey = '1h') {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     checkLeetCodeDaily(false);
-  } else if (alarm.name === UTC_MIDNIGHT_ALARM_NAME) {
-    scheduleUtcMidnightAlarm();
+  } else if (alarm.name === DAILY_RESET_ALARM_NAME || alarm.name === 'leetcode_utc_midnight_alarm') {
+    scheduleDailyResetAlarm();
     checkLeetCodeDaily(false);
   } else if (alarm.name.startsWith('contest_alarm_')) {
     const parts = alarm.name.replace('contest_alarm_', '').split('_');
