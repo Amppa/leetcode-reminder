@@ -436,3 +436,50 @@ chrome.runtime.onInstalled.addListener(() => {
   setupAlarm();
   checkLeetCodeDaily(false);
 });
+
+// Auto-check on LeetCode Problem Tab Closure
+const getStorageSession = () => chrome.storage.session || chrome.storage.local;
+
+async function trackLeetCodeTab(tabId) {
+  try {
+    const storage = getStorageSession();
+    const { trackedLeetCodeTabs = [] } = await storage.get('trackedLeetCodeTabs');
+    if (!trackedLeetCodeTabs.includes(tabId)) {
+      trackedLeetCodeTabs.push(tabId);
+      await storage.set({ trackedLeetCodeTabs });
+    }
+  } catch (e) {
+    console.error('[LeetCode Reminder] Track tab error:', e);
+  }
+}
+
+async function checkAndUntrackLeetCodeTab(tabId) {
+  try {
+    const storage = getStorageSession();
+    const { trackedLeetCodeTabs = [] } = await storage.get('trackedLeetCodeTabs');
+    const index = trackedLeetCodeTabs.indexOf(tabId);
+    if (index !== -1) {
+      trackedLeetCodeTabs.splice(index, 1);
+      await storage.set({ trackedLeetCodeTabs });
+      // Trigger instant status check when user closes or navigates away from LeetCode problem tab
+      checkLeetCodeDaily(true);
+    }
+  } catch (e) {
+    console.error('[LeetCode Reminder] Untrack tab error:', e);
+  }
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (tab.url) {
+    if (tab.url.includes('leetcode.com/problems/')) {
+      trackLeetCodeTab(tabId);
+    } else {
+      checkAndUntrackLeetCodeTab(tabId);
+    }
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  checkAndUntrackLeetCodeTab(tabId);
+});
+

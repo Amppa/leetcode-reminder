@@ -48,6 +48,8 @@ leetcode-reminder/
   - `leetcode_daily_alarm`: Periodic check every 60 minutes.
   - `leetcode_utc_midnight_alarm`: Scheduled precisely at UTC 00:00:15 (UTC midnight + 15s buffer to avoid server race conditions).
   - `contest_alarm_[weekly|biweekly]_[1h|3m]`: Scheduled 1 hour and 3 minutes before contest start times.
+- **Tab Closure Monitoring**:
+  - `chrome.tabs.onUpdated` & `chrome.tabs.onRemoved`: Tracks open LeetCode problem tabs (`leetcode.com/problems/`) and automatically triggers an instant status check (`checkLeetCodeDaily(true)`) when the user closes or navigates away from a problem tab.
 - **Notifications**:
   - `chrome.notifications.create` for unfinished daily problems, login prompts, and upcoming contest reminders.
   - `chrome.notifications.onClicked`: Single tab focus handler preventing duplicate tabs.
