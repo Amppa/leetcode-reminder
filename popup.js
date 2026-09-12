@@ -16,6 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const labelResetCountdown = document.getElementById('labelResetCountdown');
   const resetCountdown = document.getElementById('resetCountdown');
   const problemBox = document.getElementById('problemBox');
+  const debugBtn = document.getElementById('debugBtn');
+  const debugSection = document.getElementById('debugSection');
+  const debugTitle = document.getElementById('debugTitle');
+  const debugCount = document.getElementById('debugCount');
+  const copyDebugBtn = document.getElementById('copyDebugBtn');
+  const clearDebugBtn = document.getElementById('clearDebugBtn');
+
+  let isDebugMode = false;
 
   const contestUI = {
     weekly: {
@@ -140,7 +148,27 @@ document.addEventListener('DOMContentLoaded', () => {
       contestUI[type].reminders['3m'].text.textContent = t.contest_reminder_3m;
     }
 
+    if (debugBtn) debugBtn.title = t.debug_btn_title;
+    if (debugTitle) debugTitle.textContent = t.debug_title;
+    if (copyDebugBtn && !copyDebugBtn.dataset.copied) copyDebugBtn.textContent = t.debug_copy_report;
+    if (clearDebugBtn && !clearDebugBtn.dataset.cleared) clearDebugBtn.textContent = t.debug_clear;
+
     updateThemeUI();
+  }
+
+  // Update debug mode UI state and logs count
+  function updateDebugUI(enabled, logs = []) {
+    isDebugMode = !!enabled;
+    if (debugBtn) {
+      debugBtn.classList.toggle('active', isDebugMode);
+    }
+    if (debugSection) {
+      debugSection.classList.toggle('hidden', !isDebugMode);
+    }
+    if (debugCount) {
+      const count = Array.isArray(logs) ? logs.length : 0;
+      debugCount.textContent = `${count} / 500`;
+    }
   }
 
   // Apply theme to document
@@ -279,6 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentLang = items.lang;
     }
     applyTheme(items?.theme || 'dark');
+    updateDebugUI(items?.debugMode, items?.debugLogs);
     renderData(items || {});
 
     if (!isDailyChallengeFinishedToday(items)) {
@@ -300,6 +329,49 @@ document.addEventListener('DOMContentLoaded', () => {
       const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
       applyTheme(nextTheme);
       chrome.storage.local.set({ theme: nextTheme });
+    });
+  }
+
+  if (debugBtn) {
+    debugBtn.addEventListener('click', () => {
+      isDebugMode = !isDebugMode;
+      chrome.storage.local.set({ debugMode: isDebugMode }, () => {
+        chrome.storage.local.get(['debugLogs'], ({ debugLogs = [] }) => {
+          updateDebugUI(isDebugMode, debugLogs);
+        });
+      });
+    });
+  }
+
+  if (copyDebugBtn) {
+    copyDebugBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'get_diagnostic_report' }, (response) => {
+        const report = response?.report || {};
+        navigator.clipboard.writeText(JSON.stringify(report, null, 2)).then(() => {
+          const t = I18N[currentLang];
+          copyDebugBtn.dataset.copied = 'true';
+          copyDebugBtn.textContent = t.debug_copied;
+          setTimeout(() => {
+            delete copyDebugBtn.dataset.copied;
+            copyDebugBtn.textContent = t.debug_copy_report;
+          }, 1500);
+        });
+      });
+    });
+  }
+
+  if (clearDebugBtn) {
+    clearDebugBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'clear_debug_logs' }, () => {
+        const t = I18N[currentLang];
+        clearDebugBtn.dataset.cleared = 'true';
+        clearDebugBtn.textContent = t.debug_cleared;
+        if (debugCount) debugCount.textContent = '0 / 500';
+        setTimeout(() => {
+          delete clearDebugBtn.dataset.cleared;
+          clearDebugBtn.textContent = t.debug_clear;
+        }, 1500);
+      });
     });
   }
 

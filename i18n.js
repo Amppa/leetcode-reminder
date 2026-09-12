@@ -35,7 +35,13 @@ const I18N = {
       if (days > 0) return `距開始：${days}天 ${hours}小時`;
       if (hours > 0) return `距開始：${hours}小時 ${mins}分`;
       return `距開始：${mins}分鐘`;
-    }
+    },
+    debug_btn_title: '切換除錯模式',
+    debug_title: '除錯模式',
+    debug_copy_report: '複製診斷報告',
+    debug_copied: '✓ 已複製！',
+    debug_clear: '清空',
+    debug_cleared: '已清空'
   },
   en: {
     lang_btn: '中',
@@ -70,6 +76,12 @@ const I18N = {
       if (days > 0) return `Starts in ${days}d ${hours}h`;
       if (hours > 0) return `Starts in ${hours}h ${mins}m`;
       return `Starts in ${mins}m`;
-    }
+    },
+    debug_btn_title: 'Toggle Debug Mode',
+    debug_title: 'Debug Mode',
+    debug_copy_report: 'Copy Report',
+    debug_copied: '✓ Copied!',
+    debug_clear: 'Clear',
+    debug_cleared: 'Cleared'
   }
 };

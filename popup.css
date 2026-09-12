@@ -526,3 +526,85 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* ==========================================================================
+   6. DEBUG CONTROLS & PANEL
+   ========================================================================== */
+.debug-btn {
+  &.active {
+    color: var(--brand-accent);
+    border-color: var(--brand-accent);
+    background: rgba(255, 161, 22, 0.15);
+  }
+}
+
+.debug-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.debug-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+
+  &.hidden {
+    display: none;
+  }
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.debug-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.debug-count {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-action-btn {
+  padding: 3px 8px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-base);
+
+  &:hover {
+    color: var(--text-main);
+    border-color: var(--border-hover);
+    background: var(--bg-card-hover);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}

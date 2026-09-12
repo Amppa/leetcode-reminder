@@ -93,6 +93,8 @@ leetcode-reminder/
 | `LANG` | `lang` | `string` | Preferred UI language (`'zh'` or `'en'`) |
 | `THEME` | `theme` | `string` | Preferred theme (`'dark'` or `'light'`) |
 | `TRACKED_TABS` | `trackedLeetCodeTabs` | `array` | Active tab IDs currently viewing LeetCode problem pages |
+| `DEBUG_MODE` | `debugMode` | `boolean` | Enables verbose logging and 500-entry storage ring buffer |
+| `DEBUG_LOGS` | `debugLogs` | `array` | Ring buffer storing up to 500 timestamped diagnostic entries |
 
 ---
 
