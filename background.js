@@ -181,6 +181,7 @@ async function setupAlarm() {
 
   chrome.alarms.clear('leetcode_utc_midnight_alarm');
   scheduleDailyResetAlarm();
+  await syncContestAlarms();
 }
 
 // Parse Weekly and Biweekly contests from GraphQL topTwoContests array
@@ -255,10 +256,19 @@ async function checkLeetCodeDaily(forceCheck = false) {
 
     // 1. Storage-First Check
     if (!forceCheck) {
-      const cached = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
-      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc) {
+      const cached = await chrome.storage.local.get([
+        STORAGE_KEYS.LAST_STATUS,
+        STORAGE_KEYS.LAST_COMPLETED_UTC_DATE,
+        STORAGE_KEYS.CONTESTS
+      ]);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const weeklyStart = cached[STORAGE_KEYS.CONTESTS]?.weekly?.startTime || 0;
+      const hasFreshContests = weeklyStart > nowSec;
+
+      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc && hasFreshContests) {
         stopHourlyAlarm();
         await updateBadge('Finish');
+        await syncContestAlarms(cached[STORAGE_KEYS.CONTESTS]);
         return;
       }
     }
@@ -363,7 +373,7 @@ async function syncContestAlarms(contests) {
     const contest = contests?.[type];
     for (const offset of offsets) {
       const alarmName = `contest_alarm_${type}_${offset.key}`;
-      const isEnabled = contestReminders[`${type}_${offset}`] !== false;
+      const isEnabled = contestReminders[`${type}_${offset.key}`] !== false;
 
       if (isEnabled && contest?.startTime) {
         const triggerTimeMs = (contest.startTime - offset.sec) * 1000;
@@ -450,17 +460,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Setup on Startup & Install
-chrome.runtime.onStartup.addListener(() => {
-  setupAlarm();
-  checkLeetCodeDaily(false);
-});
-
-chrome.runtime.onInstalled.addListener(() => {
-  setupAlarm();
-  checkLeetCodeDaily(false);
-});
-
 // Auto-check on LeetCode Problem Tab Closure
 const getStorageSession = () => chrome.storage.session || chrome.storage.local;
 
@@ -485,16 +484,44 @@ async function checkAndUntrackLeetCodeTab(tabId) {
     if (index !== -1) {
       trackedLeetCodeTabs.splice(index, 1);
       await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
-      checkLeetCodeDaily(true);
+      // Delay 1.5s to ensure LeetCode backend submission and userStatus are updated
+      setTimeout(() => {
+        checkLeetCodeDaily(true);
+      }, 1500);
     }
   } catch (e) {
     console.error('[LeetCode Reminder] Untrack tab error:', e);
   }
 }
 
+async function scanOpenLeetCodeTabs() {
+  try {
+    const tabs = await chrome.tabs.query({ url: '*://leetcode.com/problems/*' });
+    for (const t of tabs) {
+      if (t.id) await trackLeetCodeTab(t.id);
+    }
+  } catch (e) {
+    console.error('[LeetCode Reminder] Scan tabs error:', e);
+  }
+}
+
+// Setup on Startup & Install
+chrome.runtime.onStartup.addListener(() => {
+  setupAlarm();
+  checkLeetCodeDaily(false);
+  scanOpenLeetCodeTabs();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  setupAlarm();
+  checkLeetCodeDaily(false);
+  scanOpenLeetCodeTabs();
+});
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (tab.url) {
-    if (tab.url.includes('leetcode.com/problems/')) {
+  const url = changeInfo.url || tab.url;
+  if (url) {
+    if (url.includes('leetcode.com/problems/')) {
       trackLeetCodeTab(tabId);
     } else {
       checkAndUntrackLeetCodeTab(tabId);
