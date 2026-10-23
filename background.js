@@ -565,15 +565,33 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Auto-check on LeetCode Problem Tab Closure
 const getStorageSession = () => chrome.storage.session || chrome.storage.local;
 
-async function trackLeetCodeTab(tabId) {
+// In-memory cache for tracked tab IDs to avoid redundant storage I/O and worker overhead
+const trackedTabIds = new Set();
+let isTrackedTabsInitialized = false;
+
+async function initTrackedTabs() {
+  if (isTrackedTabsInitialized) return;
   try {
     const storage = getStorageSession();
-    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
-    if (!trackedLeetCodeTabs.includes(tabId)) {
-      trackedLeetCodeTabs.push(tabId);
-      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
-      logMessage('INFO', 'Tracked LeetCode problem tab', { tabId });
+    const { [STORAGE_KEYS.TRACKED_TABS]: saved = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
+    for (const id of saved) {
+      trackedTabIds.add(id);
     }
+    isTrackedTabsInitialized = true;
+  } catch (e) {
+    // Ignore storage read errors
+  }
+}
+
+async function trackLeetCodeTab(tabId) {
+  try {
+    await initTrackedTabs();
+    if (trackedTabIds.has(tabId)) return;
+
+    trackedTabIds.add(tabId);
+    const storage = getStorageSession();
+    await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
+    logMessage('INFO', 'Tracked LeetCode problem tab', { tabId });
   } catch (e) {
     logMessage('ERROR', 'Track tab error', e.message);
     console.error('[LeetCode Reminder] Track tab error:', e);
@@ -582,18 +600,18 @@ async function trackLeetCodeTab(tabId) {
 
 async function checkAndUntrackLeetCodeTab(tabId) {
   try {
+    await initTrackedTabs();
+    // Fast path: exit immediately if the tab is not tracked
+    if (!trackedTabIds.has(tabId)) return;
+
+    trackedTabIds.delete(tabId);
     const storage = getStorageSession();
-    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
-    const index = trackedLeetCodeTabs.indexOf(tabId);
-    if (index !== -1) {
-      trackedLeetCodeTabs.splice(index, 1);
-      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
-      logMessage('INFO', 'Untracked LeetCode tab; delayed re-check scheduled', { tabId });
-      // Delay 1.5s to ensure LeetCode backend submission and userStatus are updated
-      setTimeout(() => {
-        checkLeetCodeDaily(true);
-      }, 1500);
-    }
+    await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
+    logMessage('INFO', 'Untracked LeetCode tab; delayed re-check scheduled', { tabId });
+    // Delay 1.5s to ensure LeetCode backend submission and userStatus are updated
+    setTimeout(() => {
+      checkLeetCodeDaily(true);
+    }, 1500);
   } catch (e) {
     logMessage('ERROR', 'Untrack tab error', e.message);
     console.error('[LeetCode Reminder] Untrack tab error:', e);
@@ -602,9 +620,18 @@ async function checkAndUntrackLeetCodeTab(tabId) {
 
 async function scanOpenLeetCodeTabs() {
   try {
+    await initTrackedTabs();
     const tabs = await chrome.tabs.query({ url: '*://leetcode.com/problems/*' });
+    let changed = false;
     for (const t of tabs) {
-      if (t.id) await trackLeetCodeTab(t.id);
+      if (t.id && !trackedTabIds.has(t.id)) {
+        trackedTabIds.add(t.id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const storage = getStorageSession();
+      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
     }
     logMessage('INFO', 'Scanned existing LeetCode problem tabs', { count: tabs.length });
   } catch (e) {
@@ -626,14 +653,14 @@ chrome.runtime.onInstalled.addListener(() => {
   scanOpenLeetCodeTabs();
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  const url = changeInfo.url || tab.url;
-  if (url) {
-    if (url.includes('leetcode.com/problems/')) {
-      trackLeetCodeTab(tabId);
-    } else {
-      checkAndUntrackLeetCodeTab(tabId);
-    }
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // Only process when URL has changed to prevent firing on title, favicon, or loading progress updates
+  if (!changeInfo.url) return;
+
+  if (changeInfo.url.includes('leetcode.com/problems/')) {
+    trackLeetCodeTab(tabId);
+  } else {
+    checkAndUntrackLeetCodeTab(tabId);
   }
 });
 
