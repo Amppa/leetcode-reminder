@@ -82,6 +82,7 @@ leetcode-reminder/
 | `IS_LOGGED_IN` | `isLoggedIn` | `boolean` | Indicates if `LEETCODE_SESSION` cookie is present |
 | `LAST_STATUS` | `lastStatus` | `string` | Status code: `'Finish'`, `'NotStart'`, `'not_logged_in'`, or `'error'` |
 | `LAST_CHECK_TIME` | `lastCheckTime` | `string` | Formatted local time string of last status check |
+| `LAST_CHECK_TIME_MS` | `lastCheckTimeMs` | `number` | Unix timestamp in milliseconds of last status check |
 | `TODAY_UTC` | `todayUtc` | `string` | Current UTC date string (`YYYY-MM-DD`) |
 | `LAST_COMPLETED_UTC_DATE` | `lastCompletedUtcDate` | `string` | UTC date string when daily challenge was completed |
 | `QUESTION_ID` | `questionId` | `string` | Frontend question ID (e.g., `"1"`) |

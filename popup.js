@@ -286,9 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const AUTO_REFRESH_THROTTLE_MS = 30000; // 30s throttle on popup open
+
   function isDailyChallengeFinishedToday(data) {
     const todayUtc = new Date().toISOString().slice(0, 10);
     return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
+  }
+
+  function shouldAutoRefreshOnOpen(items) {
+    if (isDailyChallengeFinishedToday(items)) return false;
+    const lastCheckMs = items?.lastCheckTimeMs || 0;
+    return (Date.now() - lastCheckMs) > AUTO_REFRESH_THROTTLE_MS;
   }
 
   // Trigger status refresh with debounce guard
@@ -314,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'isLoggedIn',
     'lastStatus',
     'lastCheckTime',
+    'lastCheckTimeMs',
     'lastCompletedUtcDate',
     'questionId',
     'questionTitle',
@@ -331,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDebugUI(items?.debugMode);
     renderData(items || {});
 
-    if (!isDailyChallengeFinishedToday(items)) {
+    if (shouldAutoRefreshOnOpen(items)) {
       triggerStatusRefresh();
     }
   });

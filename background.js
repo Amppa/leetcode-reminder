@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   IS_LOGGED_IN: 'isLoggedIn',
   LAST_STATUS: 'lastStatus',
   LAST_CHECK_TIME: 'lastCheckTime',
+  LAST_CHECK_TIME_MS: 'lastCheckTimeMs',
   TODAY_UTC: 'todayUtc',
   LAST_COMPLETED_UTC_DATE: 'lastCompletedUtcDate',
   QUESTION_ID: 'questionId',
@@ -355,11 +356,17 @@ async function checkLeetCodeDaily(forceCheck = false) {
       const weeklyStart = cached[STORAGE_KEYS.CONTESTS]?.weekly?.startTime || 0;
       const hasFreshContests = weeklyStart > nowSec;
 
-      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc && hasFreshContests) {
+      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc) {
         logMessage('INFO', 'Daily challenge already finished today (cache hit)', { todayUtc });
         stopHourlyAlarm();
         await updateBadge('Finish');
-        await syncContestAlarms(cached[STORAGE_KEYS.CONTESTS]);
+
+        if (hasFreshContests) {
+          await syncContestAlarms(cached[STORAGE_KEYS.CONTESTS]);
+        } else {
+          // If contests are stale, refresh only contests without re-querying daily problem
+          await fetchUpcomingContests();
+        }
         return;
       }
     }
@@ -375,6 +382,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
         [STORAGE_KEYS.IS_LOGGED_IN]: false,
         [STORAGE_KEYS.LAST_STATUS]: 'not_logged_in',
         [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+        [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now(),
         [STORAGE_KEYS.TODAY_UTC]: todayUtc
       });
       await updateBadge('not_logged_in');
@@ -409,6 +417,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
       [STORAGE_KEYS.IS_LOGGED_IN]: true,
       [STORAGE_KEYS.LAST_STATUS]: userStatus,
       [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+      [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now(),
       [STORAGE_KEYS.TODAY_UTC]: todayUtc,
       [STORAGE_KEYS.QUESTION_ID]: question?.frontendQuestionId || '',
       [STORAGE_KEYS.QUESTION_TITLE]: question?.title || '',
@@ -444,7 +453,8 @@ async function checkLeetCodeDaily(forceCheck = false) {
     console.error('[LeetCode Reminder] GraphQL fetch failed:', err);
     await chrome.storage.local.set({
       [STORAGE_KEYS.LAST_STATUS]: 'error',
-      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime()
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+      [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now()
     });
     const prev = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
     const todayUtc = getUtcTodayString();
