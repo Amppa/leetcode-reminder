@@ -530,7 +530,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'check_status_now') {
     checkLeetCodeDaily(true).then(() => {
       chrome.storage.local.get(null, (data) => {
-        sendResponse({ success: true, data });
+        const sanitized = { ...data };
+        delete sanitized[STORAGE_KEYS.DEBUG_LOGS];
+        sendResponse({ success: true, data: sanitized });
       });
     });
     return true;
