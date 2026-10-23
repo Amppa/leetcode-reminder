@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   IS_LOGGED_IN: 'isLoggedIn',
   LAST_STATUS: 'lastStatus',
   LAST_CHECK_TIME: 'lastCheckTime',
+  LAST_CHECK_TIME_MS: 'lastCheckTimeMs',
   TODAY_UTC: 'todayUtc',
   LAST_COMPLETED_UTC_DATE: 'lastCompletedUtcDate',
   QUESTION_ID: 'questionId',
@@ -31,6 +32,25 @@ const STORAGE_KEYS = {
 
 const MAX_DEBUG_LOGS = 500;
 
+let cachedDebugMode = null;
+
+async function isDebugModeEnabled() {
+  if (cachedDebugMode !== null) return cachedDebugMode;
+  try {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_MODE);
+    cachedDebugMode = !!data[STORAGE_KEYS.DEBUG_MODE];
+  } catch (e) {
+    cachedDebugMode = false;
+  }
+  return cachedDebugMode;
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes[STORAGE_KEYS.DEBUG_MODE]) {
+    cachedDebugMode = !!changes[STORAGE_KEYS.DEBUG_MODE].newValue;
+  }
+});
+
 // Centralized logging helper with 500-entry ring buffer in storage
 async function logMessage(level, message, data = null) {
   const timestamp = new Date().toISOString();
@@ -45,12 +65,14 @@ async function logMessage(level, message, data = null) {
     console.log(logPrefix, message, data || '');
   }
 
-  try {
-    const { [STORAGE_KEYS.DEBUG_MODE]: isDebugMode } = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_MODE);
-    if (!isDebugMode && level !== 'ERROR') {
-      return;
-    }
+  // Fast-path: if not ERROR and debugMode is not enabled, skip storage operations entirely
+  if (level !== 'ERROR') {
+    if (cachedDebugMode === false) return;
+    const isDebug = await isDebugModeEnabled();
+    if (!isDebug) return;
+  }
 
+  try {
     const { [STORAGE_KEYS.DEBUG_LOGS]: debugLogs = [] } = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_LOGS);
     const entry = {
       time: timestamp,
@@ -334,11 +356,17 @@ async function checkLeetCodeDaily(forceCheck = false) {
       const weeklyStart = cached[STORAGE_KEYS.CONTESTS]?.weekly?.startTime || 0;
       const hasFreshContests = weeklyStart > nowSec;
 
-      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc && hasFreshContests) {
+      if (cached[STORAGE_KEYS.LAST_STATUS] === 'Finish' && cached[STORAGE_KEYS.LAST_COMPLETED_UTC_DATE] === todayUtc) {
         logMessage('INFO', 'Daily challenge already finished today (cache hit)', { todayUtc });
         stopHourlyAlarm();
         await updateBadge('Finish');
-        await syncContestAlarms(cached[STORAGE_KEYS.CONTESTS]);
+
+        if (hasFreshContests) {
+          await syncContestAlarms(cached[STORAGE_KEYS.CONTESTS]);
+        } else {
+          // If contests are stale, refresh only contests without re-querying daily problem
+          await fetchUpcomingContests();
+        }
         return;
       }
     }
@@ -354,6 +382,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
         [STORAGE_KEYS.IS_LOGGED_IN]: false,
         [STORAGE_KEYS.LAST_STATUS]: 'not_logged_in',
         [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+        [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now(),
         [STORAGE_KEYS.TODAY_UTC]: todayUtc
       });
       await updateBadge('not_logged_in');
@@ -388,6 +417,7 @@ async function checkLeetCodeDaily(forceCheck = false) {
       [STORAGE_KEYS.IS_LOGGED_IN]: true,
       [STORAGE_KEYS.LAST_STATUS]: userStatus,
       [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+      [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now(),
       [STORAGE_KEYS.TODAY_UTC]: todayUtc,
       [STORAGE_KEYS.QUESTION_ID]: question?.frontendQuestionId || '',
       [STORAGE_KEYS.QUESTION_TITLE]: question?.title || '',
@@ -423,7 +453,8 @@ async function checkLeetCodeDaily(forceCheck = false) {
     console.error('[LeetCode Reminder] GraphQL fetch failed:', err);
     await chrome.storage.local.set({
       [STORAGE_KEYS.LAST_STATUS]: 'error',
-      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime()
+      [STORAGE_KEYS.LAST_CHECK_TIME]: getFormattedLocalTime(),
+      [STORAGE_KEYS.LAST_CHECK_TIME_MS]: Date.now()
     });
     const prev = await chrome.storage.local.get([STORAGE_KEYS.LAST_STATUS, STORAGE_KEYS.LAST_COMPLETED_UTC_DATE]);
     const todayUtc = getUtcTodayString();
@@ -436,12 +467,20 @@ async function checkLeetCodeDaily(forceCheck = false) {
 }
 
 // Sync 1-hour and 3-minute before alarms for Weekly & Biweekly Contests
-async function syncContestAlarms(contests) {
-  if (!contests) {
+async function syncContestAlarms(contests = null) {
+  let contestData = contests;
+  let contestReminders;
+
+  if (!contestData) {
     const data = await chrome.storage.local.get([STORAGE_KEYS.CONTESTS, STORAGE_KEYS.CONTEST_REMINDERS]);
-    contests = data[STORAGE_KEYS.CONTESTS];
+    contestData = data[STORAGE_KEYS.CONTESTS];
+    contestReminders = data[STORAGE_KEYS.CONTEST_REMINDERS];
+  } else {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.CONTEST_REMINDERS);
+    contestReminders = data[STORAGE_KEYS.CONTEST_REMINDERS];
   }
-  const { [STORAGE_KEYS.CONTEST_REMINDERS]: contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true } } = await chrome.storage.local.get(STORAGE_KEYS.CONTEST_REMINDERS);
+
+  contestReminders = contestReminders || { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true };
 
   const types = ['weekly', 'biweekly'];
   const offsets = [
@@ -501,7 +540,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'check_status_now') {
     checkLeetCodeDaily(true).then(() => {
       chrome.storage.local.get(null, (data) => {
-        sendResponse({ success: true, data });
+        const sanitized = { ...data };
+        delete sanitized[STORAGE_KEYS.DEBUG_LOGS];
+        sendResponse({ success: true, data: sanitized });
       });
     });
     return true;
@@ -565,15 +606,33 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Auto-check on LeetCode Problem Tab Closure
 const getStorageSession = () => chrome.storage.session || chrome.storage.local;
 
-async function trackLeetCodeTab(tabId) {
+// In-memory cache for tracked tab IDs to avoid redundant storage I/O and worker overhead
+const trackedTabIds = new Set();
+let isTrackedTabsInitialized = false;
+
+async function initTrackedTabs() {
+  if (isTrackedTabsInitialized) return;
   try {
     const storage = getStorageSession();
-    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
-    if (!trackedLeetCodeTabs.includes(tabId)) {
-      trackedLeetCodeTabs.push(tabId);
-      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
-      logMessage('INFO', 'Tracked LeetCode problem tab', { tabId });
+    const { [STORAGE_KEYS.TRACKED_TABS]: saved = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
+    for (const id of saved) {
+      trackedTabIds.add(id);
     }
+    isTrackedTabsInitialized = true;
+  } catch (e) {
+    // Ignore storage read errors
+  }
+}
+
+async function trackLeetCodeTab(tabId) {
+  try {
+    await initTrackedTabs();
+    if (trackedTabIds.has(tabId)) return;
+
+    trackedTabIds.add(tabId);
+    const storage = getStorageSession();
+    await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
+    logMessage('INFO', 'Tracked LeetCode problem tab', { tabId });
   } catch (e) {
     logMessage('ERROR', 'Track tab error', e.message);
     console.error('[LeetCode Reminder] Track tab error:', e);
@@ -582,18 +641,18 @@ async function trackLeetCodeTab(tabId) {
 
 async function checkAndUntrackLeetCodeTab(tabId) {
   try {
+    await initTrackedTabs();
+    // Fast path: exit immediately if the tab is not tracked
+    if (!trackedTabIds.has(tabId)) return;
+
+    trackedTabIds.delete(tabId);
     const storage = getStorageSession();
-    const { [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs = [] } = await storage.get(STORAGE_KEYS.TRACKED_TABS);
-    const index = trackedLeetCodeTabs.indexOf(tabId);
-    if (index !== -1) {
-      trackedLeetCodeTabs.splice(index, 1);
-      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: trackedLeetCodeTabs });
-      logMessage('INFO', 'Untracked LeetCode tab; delayed re-check scheduled', { tabId });
-      // Delay 1.5s to ensure LeetCode backend submission and userStatus are updated
-      setTimeout(() => {
-        checkLeetCodeDaily(true);
-      }, 1500);
-    }
+    await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
+    logMessage('INFO', 'Untracked LeetCode tab; delayed re-check scheduled', { tabId });
+    // Delay 1.5s to ensure LeetCode backend submission and userStatus are updated
+    setTimeout(() => {
+      checkLeetCodeDaily(true);
+    }, 1500);
   } catch (e) {
     logMessage('ERROR', 'Untrack tab error', e.message);
     console.error('[LeetCode Reminder] Untrack tab error:', e);
@@ -602,9 +661,18 @@ async function checkAndUntrackLeetCodeTab(tabId) {
 
 async function scanOpenLeetCodeTabs() {
   try {
+    await initTrackedTabs();
     const tabs = await chrome.tabs.query({ url: '*://leetcode.com/problems/*' });
+    let changed = false;
     for (const t of tabs) {
-      if (t.id) await trackLeetCodeTab(t.id);
+      if (t.id && !trackedTabIds.has(t.id)) {
+        trackedTabIds.add(t.id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const storage = getStorageSession();
+      await storage.set({ [STORAGE_KEYS.TRACKED_TABS]: Array.from(trackedTabIds) });
     }
     logMessage('INFO', 'Scanned existing LeetCode problem tabs', { count: tabs.length });
   } catch (e) {
@@ -626,14 +694,14 @@ chrome.runtime.onInstalled.addListener(() => {
   scanOpenLeetCodeTabs();
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  const url = changeInfo.url || tab.url;
-  if (url) {
-    if (url.includes('leetcode.com/problems/')) {
-      trackLeetCodeTab(tabId);
-    } else {
-      checkAndUntrackLeetCodeTab(tabId);
-    }
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // Only process when URL has changed to prevent firing on title, favicon, or loading progress updates
+  if (!changeInfo.url) return;
+
+  if (changeInfo.url.includes('leetcode.com/problems/')) {
+    trackLeetCodeTab(tabId);
+  } else {
+    checkAndUntrackLeetCodeTab(tabId);
   }
 });
 

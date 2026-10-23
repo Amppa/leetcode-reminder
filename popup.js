@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Update debug mode UI state and logs count
-  function updateDebugUI(enabled, logs = []) {
+  function updateDebugUI(enabled, count = null) {
     isDebugMode = !!enabled;
     if (debugBtn) {
       debugBtn.classList.toggle('active', isDebugMode);
@@ -165,9 +165,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (debugSection) {
       debugSection.classList.toggle('hidden', !isDebugMode);
     }
-    if (debugCount) {
-      const count = Array.isArray(logs) ? logs.length : 0;
-      debugCount.textContent = `${count} / 500`;
+    if (isDebugMode) {
+      if (typeof count === 'number') {
+        if (debugCount) debugCount.textContent = `${count} / 500`;
+      } else {
+        chrome.storage.local.get(['debugLogs'], ({ debugLogs = [] }) => {
+          if (debugCount) debugCount.textContent = `${debugLogs.length} / 500`;
+        });
+      }
     }
   }
 
@@ -281,9 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const AUTO_REFRESH_THROTTLE_MS = 30000; // 30s throttle on popup open
+
   function isDailyChallengeFinishedToday(data) {
     const todayUtc = new Date().toISOString().slice(0, 10);
     return data?.lastStatus === 'Finish' && data?.lastCompletedUtcDate === todayUtc;
+  }
+
+  function shouldAutoRefreshOnOpen(items) {
+    if (isDailyChallengeFinishedToday(items)) return false;
+    const lastCheckMs = items?.lastCheckTimeMs || 0;
+    return (Date.now() - lastCheckMs) > AUTO_REFRESH_THROTTLE_MS;
   }
 
   // Trigger status refresh with debounce guard
@@ -302,15 +315,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 1. Initial Load & Render
-  chrome.storage.local.get(null, (items) => {
+  const POPUP_REQUIRED_KEYS = [
+    'lang',
+    'theme',
+    'debugMode',
+    'isLoggedIn',
+    'lastStatus',
+    'lastCheckTime',
+    'lastCheckTimeMs',
+    'lastCompletedUtcDate',
+    'questionId',
+    'questionTitle',
+    'questionDifficulty',
+    'questionLink',
+    'contests',
+    'contestReminders'
+  ];
+
+  chrome.storage.local.get(POPUP_REQUIRED_KEYS, (items) => {
     if (items && items.lang) {
       currentLang = items.lang;
     }
     applyTheme(items?.theme || 'dark');
-    updateDebugUI(items?.debugMode, items?.debugLogs);
+    updateDebugUI(items?.debugMode);
     renderData(items || {});
 
-    if (!isDailyChallengeFinishedToday(items)) {
+    if (shouldAutoRefreshOnOpen(items)) {
       triggerStatusRefresh();
     }
   });
@@ -336,9 +366,13 @@ document.addEventListener('DOMContentLoaded', () => {
     debugBtn.addEventListener('click', () => {
       isDebugMode = !isDebugMode;
       chrome.storage.local.set({ debugMode: isDebugMode }, () => {
-        chrome.storage.local.get(['debugLogs'], ({ debugLogs = [] }) => {
-          updateDebugUI(isDebugMode, debugLogs);
-        });
+        if (isDebugMode) {
+          chrome.storage.local.get(['debugLogs'], ({ debugLogs = [] }) => {
+            updateDebugUI(isDebugMode, debugLogs.length);
+          });
+        } else {
+          updateDebugUI(false);
+        }
       });
     });
   }
