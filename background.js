@@ -31,6 +31,25 @@ const STORAGE_KEYS = {
 
 const MAX_DEBUG_LOGS = 500;
 
+let cachedDebugMode = null;
+
+async function isDebugModeEnabled() {
+  if (cachedDebugMode !== null) return cachedDebugMode;
+  try {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_MODE);
+    cachedDebugMode = !!data[STORAGE_KEYS.DEBUG_MODE];
+  } catch (e) {
+    cachedDebugMode = false;
+  }
+  return cachedDebugMode;
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes[STORAGE_KEYS.DEBUG_MODE]) {
+    cachedDebugMode = !!changes[STORAGE_KEYS.DEBUG_MODE].newValue;
+  }
+});
+
 // Centralized logging helper with 500-entry ring buffer in storage
 async function logMessage(level, message, data = null) {
   const timestamp = new Date().toISOString();
@@ -45,12 +64,14 @@ async function logMessage(level, message, data = null) {
     console.log(logPrefix, message, data || '');
   }
 
-  try {
-    const { [STORAGE_KEYS.DEBUG_MODE]: isDebugMode } = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_MODE);
-    if (!isDebugMode && level !== 'ERROR') {
-      return;
-    }
+  // Fast-path: if not ERROR and debugMode is not enabled, skip storage operations entirely
+  if (level !== 'ERROR') {
+    if (cachedDebugMode === false) return;
+    const isDebug = await isDebugModeEnabled();
+    if (!isDebug) return;
+  }
 
+  try {
     const { [STORAGE_KEYS.DEBUG_LOGS]: debugLogs = [] } = await chrome.storage.local.get(STORAGE_KEYS.DEBUG_LOGS);
     const entry = {
       time: timestamp,
@@ -436,12 +457,20 @@ async function checkLeetCodeDaily(forceCheck = false) {
 }
 
 // Sync 1-hour and 3-minute before alarms for Weekly & Biweekly Contests
-async function syncContestAlarms(contests) {
-  if (!contests) {
+async function syncContestAlarms(contests = null) {
+  let contestData = contests;
+  let contestReminders;
+
+  if (!contestData) {
     const data = await chrome.storage.local.get([STORAGE_KEYS.CONTESTS, STORAGE_KEYS.CONTEST_REMINDERS]);
-    contests = data[STORAGE_KEYS.CONTESTS];
+    contestData = data[STORAGE_KEYS.CONTESTS];
+    contestReminders = data[STORAGE_KEYS.CONTEST_REMINDERS];
+  } else {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.CONTEST_REMINDERS);
+    contestReminders = data[STORAGE_KEYS.CONTEST_REMINDERS];
   }
-  const { [STORAGE_KEYS.CONTEST_REMINDERS]: contestReminders = { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true } } = await chrome.storage.local.get(STORAGE_KEYS.CONTEST_REMINDERS);
+
+  contestReminders = contestReminders || { weekly_1h: true, biweekly_1h: true, weekly_3m: true, biweekly_3m: true };
 
   const types = ['weekly', 'biweekly'];
   const offsets = [
